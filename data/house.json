@@ -62,7 +62,7 @@
     { "id": "d-tek",       "at": [6.36, 1.89],  "width": 0.7, "type": "door" },
     { "id": "d-garage-bryg","at": [7.74, 2.75], "width": 0.8, "type": "door" },
     { "id": "d-bryg-alrum","at": [11.6, 3.88],  "width": 0.8, "type": "door" },
-    { "id": "d-vikt",      "at": [12.37, 3.4],  "width": 0.7, "type": "door" },
+    { "id": "d-vikt",      "at": [12.37, 2.9],  "width": 0.7, "type": "door" },
     { "id": "d-vaerV",     "at": [10.95, 4.45], "width": 0.8, "type": "door" },
     { "id": "d-vaerN",     "at": [18.13, 1.8],  "width": 0.8, "type": "door" },
     { "id": "d-entre-alrum","at": [19.25, 3.88],"width": 1.2, "type": "door", "leaves": 2 },
@@ -93,6 +93,14 @@
     { "id": "master",   "name": "Soveværelse", "floor": "wood",    "poly": [[20.07, 13.1], [21.35, 13.1], [21.35, 15.47], [23.47, 15.47], [23.47, 20.04], [20.07, 20.04]] }
   ],
 
+  "_appliancesDoc": "Hvidevarer beboerne kan gå hen til og åbne. standAt = hvor man står (foran skabet i data/furniture.json 'hoejskabe').",
+  "appliances": [
+    { "id": "koeleskab", "kind": "fridge", "standAt": [12.68, 4.5] },
+    { "id": "fryser", "kind": "freezer", "standAt": [14.33, 4.5] },
+    { "id": "lampe-nord", "kind": "lamp", "standAt": [22.6, 16.0] },
+    { "id": "lampe-syd", "kind": "lamp", "standAt": [22.6, 18.8] }
+  ],
+
   "roofs": [
     { "id": "west-wing", "x": [0, 19.0],    "z": [1.36, 8.11], "ridgeAxis": "x", "pitchDeg": 35, "overhang": 0.25, "gableEnds": ["min"] },
     { "id": "east-wing", "x": [15.6, 23.47],"z": [0, 20.04],   "ridgeAxis": "z", "pitchDeg": 35, "overhang": 0.25, "gableEnds": ["min", "max"] }
@@ -115,7 +123,7 @@
       { "a": [33, -7],    "b": [33, 30.5],  "height": 1.9, "depth": 0.9 },
       { "a": [-6, -7],    "b": [33, -7],    "height": 1.9, "depth": 0.9 },
       { "a": [11.3, 11.0],"b": [11.3, 15.2],"height": 1.8, "depth": 0.9 },
-      { "a": [2.0, 12.0], "b": [9.5, 12.0], "height": 1.6, "depth": 0.8 }
+      { "a": [12.06, 16.1], "b": [12.06, 23.6], "height": 1.6, "depth": 0.8 }
     ],
     "retainingWalls": [
       { "a": [12.46, 21.6], "b": [26.25, 21.6], "height": 0.8 },

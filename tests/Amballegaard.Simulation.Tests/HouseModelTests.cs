@@ -263,6 +263,22 @@ public class HouseModelTests
         Assert.NotEqual(MowerState.Charging, m.State);
     }
 
+    [Fact]
+    public void Residents_open_fridge_and_comment()
+    {
+        var world = new World(Load(), Family.Create(), seed: 4);
+        var opened = false;
+        for (var i = 0; i < 20000 && !opened; i++)
+        {
+            world.Tick(0.1);
+            opened = world.OpenDoors.Contains("koeleskab") || world.OpenDoors.Contains("fryser");
+        }
+        Assert.True(opened, "Ingen åbnede køleskab eller fryser");
+        Assert.Contains(world.Agents, a => a.Speech is not null &&
+            (Speech.FridgeLines.Contains(a.Speech) || Speech.FreezerLines.Contains(a.Speech)));
+        Assert.True(world.ToggleDoor("koeleskab"));
+    }
+
     private static double DistanceToSegment(Vec2 p, Vec2 a, Vec2 b)
     {
         var ab = b - a;

@@ -12,12 +12,12 @@ public sealed class Mower
 {
     public const double MowSeconds = 60, ChargeSeconds = 25, Speed = 0.45;
 
-    /// <summary>Ladestation og vejen mellem den og plænen (nord om havebordet, ud vest for terrassen).</summary>
+    /// <summary>Ladestation og vejen mellem den og plænen: nord om havebordet, nord om hækken ved terrassens vestkant og ud på plænen.</summary>
     public static readonly Vec2 Dock = new(19.35, 17.6);
-    private static readonly Vec2[] RouteOut = [new(18.9, 16.55), new(12.9, 16.55), new(11.4, 16.9)];
+    private static readonly Vec2[] RouteOut = [new(18.9, 16.55), new(13.2, 16.55), new(12.6, 15.75), new(10.6, 15.75), new(10.6, 16.6)];
 
     /// <summary>Klippeområdet: plænen vest for terrassen (A) og det store græsstykke syd for huset (B).</summary>
-    private static readonly (Vec2 Min, Vec2 Max) AreaA = (new(-5.0, 16.4), new(11.6, 29.4));
+    private static readonly (Vec2 Min, Vec2 Max) AreaA = (new(-5.0, 16.4), new(11.2, 29.4));
     private static readonly (Vec2 Min, Vec2 Max) AreaB = (new(-5.0, 22.6), new(31.8, 29.4));
     private static readonly Vec2 Junction = new(9.0, 25.5);
 

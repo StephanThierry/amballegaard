@@ -143,7 +143,7 @@ public sealed class World
     /// <summary>Åbn/luk en port eller tænd/sluk en pejs.</summary>
     public bool ToggleDoor(string openingId)
     {
-        if (House.Openings.All(o => o.Id != openingId)) return false;
+        if (House.Openings.All(o => o.Id != openingId) && House.Appliances.All(a => a.Id != openingId)) return false;
         if (!_openDoors.Remove(openingId)) _openDoors.Add(openingId);
         return true;
     }
@@ -192,8 +192,17 @@ public sealed class World
             }
             else
             {
+                var app = agent.PendingAppliance;
                 ClearPath(agent);
                 agent.IdleSeconds = 2 + _rng.NextDouble() * 6;
+                if (app is not null)
+                {
+                    // Fremme ved køleskab/fryser: åbn, kig ind og kommentér. Lukkes igen ved næste tur.
+                    agent.HeldDoors.Add(app.Id);
+                    agent.Heading = Math.PI;
+                    agent.IdleSeconds = 5;
+                    Say(agent, Speech.Appliance(app.Kind, _rng));
+                }
             }
         }
         else
@@ -211,8 +220,25 @@ public sealed class World
     /// </summary>
     private void PlanIndoorWalk(Agent agent)
     {
+        agent.HeldDoors.Clear(); // luk køleskab/fryser efter besøget
         var roll = _rng.NextDouble();
         var roomId = agent.WanderRoomId!;
+
+        // Indimellem: gå hen og kig i køleskabet eller fryseren.
+        var visitable = House.Appliances.Where(a => a.Kind is "fridge" or "freezer").ToList();
+        if (agent.Kind != AgentKind.Dog && visitable.Count > 0 && _rng.NextDouble() < 0.18)
+        {
+            var app = visitable[_rng.Next(visitable.Count)];
+            var appRoom = House.RoomAt(app.Stand);
+            var appPath = appRoom is null ? null : Nav.FindPath(agent.Position, app.Stand);
+            if (appPath is { Count: > 0 })
+            {
+                agent.WanderRoomId = appRoom!.Id;
+                agent.PendingAppliance = app;
+                StartPath(agent, appPath);
+                return;
+            }
+        }
         if (roll < 0.3)
         {
             var candidates = House.Rooms.Where(r => r.Id != roomId && r.Id is not ("tek" or "vikt")).ToList();
@@ -227,6 +253,11 @@ public sealed class World
         if (path is null || path.Count == 0) return;
 
         agent.WanderRoomId = roomId;
+        StartPath(agent, path);
+    }
+
+    private void StartPath(Agent agent, List<Vec2> path)
+    {
         agent.Path = path;
         agent.PathIndex = 0;
         agent.Target = path[0];
@@ -251,6 +282,7 @@ public sealed class World
         agent.Path = null;
         agent.Crossings = [];
         agent.HeldDoors.Clear();
+        agent.PendingAppliance = null;
     }
 
     private Vec2 NextWanderTarget(Agent agent)

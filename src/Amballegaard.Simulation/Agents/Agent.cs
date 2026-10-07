@@ -45,6 +45,8 @@ public sealed class Agent
     internal List<DoorCrossing> Crossings { get; set; } = [];
     internal double Travelled { get; set; }
     internal HashSet<string> HeldDoors { get; } = [];
+    /// <summary>Hvidevare beboeren er på vej hen for at åbne (køleskab/fryser).</summary>
+    internal ApplianceDef? PendingAppliance { get; set; }
     internal double IdleSeconds { get; set; }
     internal double SpeechRemaining { get; set; }
     internal double NextSpeechIn { get; set; }

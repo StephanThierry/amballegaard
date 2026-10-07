@@ -1,8 +1,8 @@
 import { RoundedBox, useGLTF } from '@react-three/drei'
 import { Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
-import { useFrame } from '@react-three/fiber'
-import { useStore } from '../store'
+import { useFrame, type ThreeEvent } from '@react-three/fiber'
+import { toggleDoor, useStore } from '../store'
 import { createGame } from './games'
 import { getMaterials } from './materials'
 import { meterBox } from './util'
@@ -52,10 +52,12 @@ function Box({ p, s, m, rot = 0, shadow = true }: { p: V3; s: V3; m: THREE.Mater
 }
 
 /** glTF fra Poly Haven, normaliseret: bunden i y=0, centreret i xz, valgfri tilpasning til højde/bredde. */
-function Model({ name, p, rot = 0, height, width }: { name: string; p: V3; rot?: number; height?: number; width?: number }) {
+function Model({ name, p, rot = 0, height, width, hide }: { name: string; p: V3; rot?: number; height?: number; width?: number; hide?: string[] }) {
   const { scene } = useGLTF(`/assets/models/${name}/${name}.gltf`)
   const obj = useMemo(() => {
     const root = scene.clone(true)
+    // Skjul udvalgte dele af modellen (fx bordet i et havesæt, så stolene kan bruges med et andet bord).
+    if (hide?.length) root.traverse((o) => { if (hide.some((h) => o.name.endsWith(h))) o.visible = false })
     root.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) {
         o.castShadow = true
@@ -70,7 +72,7 @@ function Model({ name, p, rot = 0, height, width }: { name: string; p: V3; rot?:
     wrap.add(root)
     wrap.scale.setScalar(k)
     return wrap
-  }, [scene, height, width])
+  }, [scene, height, width, hide?.join(',')])
   return <primitive object={obj} position={p} rotation={[0, rot, 0]} />
 }
 
@@ -275,7 +277,7 @@ function Toilet({ p, rot = 0 }: { p: V3; rot?: number }) {
   )
 }
 
-function Vanity({ p, rot = 0, w = 1.2 }: { p: V3; rot?: number; w?: number }) {
+function Vanity({ p, rot = 0, w = 1.2, bigMirror = false }: { p: V3; rot?: number; w?: number; bigMirror?: boolean }) {
   const f = fm()
   // Væg ved -z
   return (
@@ -284,8 +286,55 @@ function Vanity({ p, rot = 0, w = 1.2 }: { p: V3; rot?: number; w?: number }) {
       <Box p={[0, 0.81, 0]} s={[w + 0.02, 0.025, 0.5]} m={f.porcelain} />
       <mesh material={f.porcelain} position={[0, 0.84, 0.02]} scale={[0.22, 0.04, 0.16]}><sphereGeometry args={[1, 20, 10]} /></mesh>
       <mesh material={f.steel} position={[0, 0.92, -0.18]}><cylinderGeometry args={[0.015, 0.015, 0.18, 8]} /></mesh>
-      <WallMounted><Box p={[0, 1.5, -0.235]} s={[w * 0.9, 0.8, 0.01]} m={f.mirror} shadow={false} /></WallMounted>
+      <WallMounted>
+        {bigMirror
+          ? <BigMirror w={w} />
+          : <Box p={[0, 1.5, -0.235]} s={[w * 0.9, 0.8, 0.01]} m={f.mirror} shadow={false} />}
+      </WallMounted>
     </At>
+  )
+}
+
+/** Stort firkantet spejl over hele vaskens bredde med to lysrør på arme ca. 20 cm ud fra spejlet. */
+function BigMirror({ w }: { w: number }) {
+  const f = fm()
+  const tube = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff4e0', emissiveIntensity: 2.2, toneMapped: false }), [])
+  const mw = w + 0.1, mh = 1.05, y0 = 1.0, zWall = -0.235
+  const tubeLen = mw * 0.4
+  return (
+    <group>
+      <Box p={[0, y0 + mh / 2, zWall]} s={[mw, mh, 0.012]} m={f.mirror} shadow={false} />
+      {[-1, 1].map((sx) => (
+        <group key={sx} position={[sx * mw / 4, y0 + mh + 0.04, zWall]}>
+          <Box p={[0, 0, 0.1]} s={[0.025, 0.025, 0.2]} m={f.steel} />
+          <Box p={[0, 0, 0.005]} s={[0.06, 0.06, 0.012]} m={f.steel} />
+          <mesh material={f.steel} position={[0, -0.01, 0.2]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.024, 0.024, tubeLen + 0.03, 16]} /></mesh>
+          <mesh material={tube} position={[0, -0.022, 0.2]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.018, 0.018, tubeLen, 16]} /></mesh>
+          <pointLight position={[0, -0.12, 0.25]} color="#fff1dc" intensity={0.8} distance={2.2} decay={2} />
+        </group>
+      ))}
+    </group>
+  )
+}
+
+/** Stor brusenische i et hjørne (vægge ved -x og -z): flise-gulv, fast glasvæg mod +x, regnbruser og termostat. */
+function ShowerNiche({ w = 1.0, d = 1.0 }: { w?: number; d?: number }) {
+  const f = fm()
+  const m = getMaterials()
+  return (
+    <group>
+      <Box p={[0, 0.012, 0]} s={[w, 0.024, d]} m={f.porcelain} />
+      <Box p={[0, 0.026, 0]} s={[0.1, 0.004, 0.1]} m={f.steel} shadow={false} />
+      <mesh material={m.glass} position={[w / 2, 1.0, -0.12]}><boxGeometry args={[0.01, 2.0, d - 0.24]} /></mesh>
+      <Box p={[w / 2, 2.0, -0.12]} s={[0.02, 0.02, d - 0.24]} m={f.steel} />
+      <Box p={[w / 2, 1.0, -d / 2]} s={[0.03, 2.0, 0.03]} m={f.steel} />
+      {/* Regnbruser fra væggen */}
+      <Box p={[-w / 2 + 0.2, 2.1, -d / 2 + 0.01]} s={[0.02, 0.02, 0.02]} m={f.steel} />
+      <mesh material={f.steel} position={[-w / 2 + 0.03, 1.2, -0.1]}><cylinderGeometry args={[0.012, 0.012, 1.8, 10]} /></mesh>
+      <mesh material={f.steel} position={[-w / 2 + 0.15, 2.1, -0.1]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.012, 0.012, 0.25, 10]} /></mesh>
+      <mesh material={f.steel} position={[-w / 2 + 0.3, 2.08, -0.1]}><cylinderGeometry args={[0.15, 0.15, 0.012, 32]} /></mesh>
+      <Box p={[-w / 2 + 0.045, 1.05, -0.1]} s={[0.04, 0.08, 0.22]} m={f.steel} />
+    </group>
   )
 }
 
@@ -385,20 +434,11 @@ function Counter({ length }: { length: number }) {
     <group>
       <Box p={[0, 0.44, 0]} s={[length, 0.88, 0.6]} m={f.white} />
       <Box p={[0, 0.9, 0]} s={[length + 0.02, 0.035, 0.62]} m={f.darkTop} />
-      <Box p={[-length / 4, 0.905, 0]} s={[0.45, 0.01, 0.38]} m={f.steel} shadow={false} />
+      <Box p={[length / 4, 0.905, 0]} s={[0.45, 0.01, 0.38]} m={f.steel} shadow={false} />
     </group>
   )
 }
 
-function TallCabinets({ w }: { w: number }) {
-  const f = fm()
-  return (
-    <group>
-      <Box p={[0, 1.1, -0.011]} s={[w, 2.2, 0.478]} m={f.white} />
-      <CabinetDoors w={w} h={2.2} y0={0} z={0.239} count={4} m={f.white} />
-    </group>
-  )
-}
 
 function KitchenIsland() {
   const f = fm()
@@ -599,13 +639,14 @@ function Dresser({ w = 1.0, h = 0.8, d = 0.45, drawers = 4, color = '#141414', f
 }
 
 /** Lille sort knop formet som en ludobrik (fod, krop og kugle), der stikker ud af skuffen langs +z. */
-function LudoKnob({ position }: { position: [number, number, number] }) {
+function LudoKnob({ position, silver = false }: { position: [number, number, number]; silver?: boolean }) {
   const f = fm()
+  const knobMat = silver ? f.steel : f.blackGlass
   return (
     <group position={position} rotation={[Math.PI / 2, 0, 0]}>
-      <mesh material={f.blackGlass} position={[0, 0.003, 0]}><cylinderGeometry args={[0.011, 0.012, 0.006, 16]} /></mesh>
-      <mesh material={f.blackGlass} position={[0, 0.014, 0]}><cylinderGeometry args={[0.0045, 0.009, 0.016, 16]} /></mesh>
-      <mesh material={f.blackGlass} position={[0, 0.026, 0]} castShadow><sphereGeometry args={[0.0075, 16, 12]} /></mesh>
+      <mesh material={knobMat} position={[0, 0.003, 0]}><cylinderGeometry args={[0.011, 0.012, 0.006, 16]} /></mesh>
+      <mesh material={knobMat} position={[0, 0.014, 0]}><cylinderGeometry args={[0.0045, 0.009, 0.016, 16]} /></mesh>
+      <mesh material={knobMat} position={[0, 0.026, 0]} castShadow><sphereGeometry args={[0.0075, 16, 12]} /></mesh>
     </group>
   )
 }
@@ -1465,6 +1506,493 @@ function GasGrill({ w = 1.45 }: { w?: number }) {
   )
 }
 
+/**
+ * Sage Barista Touch Impress: børstet stålkabinet, bønnebeholder på toppen, berøringsskærm, portafilter med
+ * tampearm i venstre side, damprør i højre side, drypbakke og kop. Lokalt: front mod +z, bund i y=0.
+ */
+function EspressoMachine() {
+  const m = useMemo(() => ({
+    steel: new THREE.MeshStandardMaterial({ color: '#c9ccce', roughness: 0.32, metalness: 1 }),
+    dark: new THREE.MeshStandardMaterial({ color: '#1b1c1e', roughness: 0.45, metalness: 0.3 }),
+    hopper: new THREE.MeshPhysicalMaterial({ color: '#3a2a20', roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false }),
+    beans: new THREE.MeshStandardMaterial({ color: '#3b2314', roughness: 0.8 }),
+    screen: new THREE.MeshStandardMaterial({ color: '#0b0d10', emissive: '#d9a35a', emissiveIntensity: 0.35, roughness: 0.15 }),
+    cup: new THREE.MeshStandardMaterial({ color: '#f4f2ee', roughness: 0.3 }),
+  }), [])
+  const W = 0.36, H = 0.41, D = 0.37
+  return (
+    <group>
+      {/* Kabinet: bagdel + overdel der rager frem over bryggruppen */}
+      <RoundedBox args={[W, H - 0.02, D - 0.1]} radius={0.02} smoothness={3} position={[0, H / 2, -0.05]} material={m.steel} castShadow receiveShadow />
+      <RoundedBox args={[W, 0.12, D]} radius={0.02} smoothness={3} position={[0, H - 0.07, 0]} material={m.steel} castShadow />
+      <RoundedBox args={[W, 0.05, D]} radius={0.015} smoothness={3} position={[0, 0.025, 0]} material={m.steel} />
+      {/* Drypbakke med rist */}
+      <mesh material={m.dark} position={[0, 0.052, D / 2 - 0.08]}><boxGeometry args={[W - 0.04, 0.004, 0.14]} /></mesh>
+      {/* Berøringsskærm på forsiden af overdelen */}
+      <mesh material={m.screen} position={[0.06, H - 0.07, D / 2 + 0.001]}><planeGeometry args={[0.1, 0.07]} /></mesh>
+      {/* Bønnebeholder */}
+      <mesh material={m.beans} position={[-0.06, H + 0.04, -0.06]}><cylinderGeometry args={[0.055, 0.045, 0.06, 20]} /></mesh>
+      <mesh material={m.hopper} position={[-0.06, H + 0.06, -0.06]}><cylinderGeometry args={[0.065, 0.05, 0.12, 20]} /></mesh>
+      <mesh material={m.dark} position={[-0.06, H + 0.125, -0.06]}><cylinderGeometry args={[0.067, 0.067, 0.012, 20]} /></mesh>
+      {/* Bryggruppe + portafilter med greb */}
+      <mesh material={m.steel} position={[-0.05, H - 0.15, D / 2 - 0.1]}><cylinderGeometry args={[0.045, 0.045, 0.03, 24]} /></mesh>
+      <mesh material={m.dark} position={[-0.05, H - 0.17, D / 2 - 0.02]} rotation={[Math.PI / 2 - 0.25, 0, 0]} castShadow><cylinderGeometry args={[0.013, 0.016, 0.13, 12]} /></mesh>
+      {/* Tampearm i venstre side */}
+      <mesh material={m.steel} position={[-W / 2 - 0.006, H - 0.12, 0.06]} rotation={[0.4, 0, 0]}><boxGeometry args={[0.012, 0.15, 0.025]} /></mesh>
+      {/* Damprør i højre side */}
+      <mesh material={m.steel} position={[W / 2 - 0.05, H - 0.2, D / 2 - 0.03]} rotation={[0.15, 0, 0]}><cylinderGeometry args={[0.006, 0.006, 0.16, 10]} /></mesh>
+      {/* Drejeknap */}
+      <mesh material={m.steel} position={[W / 2 - 0.05, H - 0.07, D / 2 + 0.01]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.018, 0.018, 0.02, 20]} /></mesh>
+      {/* Kop på drypbakken */}
+      <mesh material={m.cup} position={[-0.05, 0.09, D / 2 - 0.08]} castShadow><cylinderGeometry args={[0.035, 0.028, 0.07, 20]} /></mesh>
+    </group>
+  )
+}
+
+/** Blød 0→1 for om en hvidevare er åben (serverens openDoors). */
+function useApplianceOpen(id: string) {
+  const open = useStore((st) => st.snapshot?.openDoors.includes(id) ?? false)
+  const f = useRef(0)
+  return (dt: number) => {
+    f.current += THREE.MathUtils.clamp((open ? 1 : 0) - f.current, -dt / 0.8, dt / 0.8)
+    return f.current * f.current * (3 - 2 * f.current)
+  }
+}
+
+const applianceClick = (id: string) => ({
+  onClick: (e: ThreeEvent<MouseEvent>) => {
+    if (useStore.getState().tool === 'vector') return
+    e.stopPropagation()
+    toggleDoor(id)
+  },
+  onPointerOver: (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer' },
+  onPointerOut: () => { document.body.style.cursor = '' },
+})
+
+const kitchenMats = (() => {
+  let c: ReturnType<typeof make> | null = null
+  function make() {
+    const s = (p: THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial(p)
+    return {
+      inner: s({ color: '#f7f8f8', roughness: 0.4, emissive: '#ffffff', emissiveIntensity: 0.15 }),
+      frost: s({ color: '#e6f0f5', roughness: 0.6 }),
+      shelf: new THREE.MeshPhysicalMaterial({ color: '#dfeef2', roughness: 0.05, transparent: true, opacity: 0.45, depthWrite: false }),
+      ovenGlass: s({ color: '#0c0d0f', roughness: 0.08, metalness: 0.3 }),
+      display: s({ color: '#050505', emissive: '#ff9a3c', emissiveIntensity: 1.2, toneMapped: false }),
+      food: ['#ffffff', '#f2d16b', '#d9442b', '#4f9a3c', '#f29b38', '#7b4a2c', '#2f6db0', '#c8a46e', '#e8e0c8'].map((c) => s({ color: c, roughness: 0.6 })),
+    }
+  }
+  return () => (c ??= make())
+})()
+
+/**
+ * Fire høje hvide køkkenskabe (front mod +z): køleskab (åbnes, fyldt med madvarer), to søjler med Siemens-ovn
+ * (overskab, ovn, tre skuffer) og fryser med fryseskuffer (åbnes). Køleskab/fryser styres via serverens openDoors.
+ */
+function KitchenTall({ w = 2.2, fridgeId = 'koeleskab', freezerId = 'fryser' }: { w?: number; fridgeId?: string; freezerId?: string }) {
+  const f = fm()
+  const cw = w / 4, H = 2.2, D = 0.478
+  const col = (i: number) => -w / 2 + cw * (i + 0.5)
+  return (
+    <group>
+      <Fridge id={fridgeId} x={col(0)} cw={cw} H={H} D={D} />
+      {[1, 2].map((i) => <OvenColumn key={i} x={col(i)} cw={cw} H={H} D={D} />)}
+      <Freezer id={freezerId} x={col(3)} cw={cw} H={H} D={D} />
+      {/* Sokkel */}
+      <Box p={[0, 0.05, -0.04]} s={[w, 0.1, D - 0.06]} m={f.darkTop} shadow={false} />
+    </group>
+  )
+}
+
+/** Hul korpus (bag, sider, top, bund) så indholdet ses når lågen/skufferne åbnes. */
+function Carcass({ cw, H, D, y0 = 0.1 }: { cw: number; H: number; D: number; y0?: number }) {
+  const f = fm()
+  const T = 0.018
+  return (
+    <group>
+      <Box p={[0, (H + y0) / 2, -D / 2 + T / 2 - 0.011]} s={[cw, H - y0, T]} m={f.white} />
+      {[-1, 1].map((s) => <Box key={s} p={[s * (cw / 2 - T / 2), (H + y0) / 2, -0.011]} s={[T, H - y0, D]} m={f.white} />)}
+      <Box p={[0, H - T / 2, -0.011]} s={[cw, T, D]} m={f.white} />
+      <Box p={[0, y0 + T / 2, -0.011]} s={[cw, T, D]} m={f.white} />
+    </group>
+  )
+}
+
+function Fridge({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: number; D: number }) {
+  const f = fm()
+  const k = kitchenMats()
+  const door = useRef<THREE.Group>(null)
+  const step = useApplianceOpen(id)
+  useFrame((_, dt) => { if (door.current) door.current.rotation.y = -step(dt) * 1.75 })
+  const inW = cw - 0.04, inD = D - 0.06
+  const shelves = [0.45, 0.85, 1.25, 1.65]
+  // Madvarer pr. hylde: [type, x, z, farve]
+  const items: [string, number, number, number][] = [
+    ['milk', -0.14, 0.04, 0], ['juice', -0.05, 0.05, 4], ['jar', 0.06, 0.0, 6], ['jar', 0.15, 0.06, 2],
+    ['cheese', -0.12, 0.0, 1], ['box', 0.0, 0.02, 7], ['butter', 0.13, 0.05, 8],
+    ['veg', -0.13, 0.03, 3], ['veg', -0.05, 0.05, 2], ['veg', 0.05, 0.0, 4], ['bowl', 0.14, 0.02, 0],
+    ['bottle', -0.15, -0.05, 3], ['bottle', -0.09, -0.04, 6], ['box', 0.05, 0.03, 5], ['eggs', 0.15, 0.05, 1],
+  ]
+  return (
+    <group position={[x, 0, 0]}>
+      <Carcass cw={cw} H={H} D={D} />
+      <mesh material={k.inner} position={[0, H / 2 + 0.05, -D / 2 + 0.01]}><planeGeometry args={[inW, H - 0.2]} /></mesh>
+      {shelves.map((y) => <mesh key={y} material={k.shelf} position={[0, y, -0.02]}><boxGeometry args={[inW, 0.006, inD - 0.08]} /></mesh>)}
+      {/* Grøntsagsskuffe nederst */}
+      <Box p={[0, 0.25, -0.01]} s={[inW - 0.02, 0.2, inD - 0.06]} m={k.shelf} shadow={false} />
+      {items.map(([type, ix, iz, c], i) => {
+        const y = (i < 4 ? shelves[3] : i < 7 ? shelves[2] : i < 11 ? shelves[1] : shelves[0]) + 0.003
+        const m = k.food[c]
+        switch (type) {
+          case 'milk': return <Box key={i} p={[ix, y + 0.1, iz]} s={[0.07, 0.2, 0.07]} m={m} />
+          case 'juice': return <Box key={i} p={[ix, y + 0.09, iz]} s={[0.06, 0.18, 0.06]} m={m} />
+          case 'bottle': return <mesh key={i} material={m} position={[ix, y + 0.12, iz]}><cylinderGeometry args={[0.03, 0.035, 0.24, 14]} /></mesh>
+          case 'jar': return <mesh key={i} material={m} position={[ix, y + 0.05, iz]}><cylinderGeometry args={[0.035, 0.035, 0.1, 16]} /></mesh>
+          case 'cheese': return <mesh key={i} material={m} position={[ix, y + 0.04, iz]} rotation={[0, 0.4, 0]}><cylinderGeometry args={[0.07, 0.07, 0.08, 3]} /></mesh>
+          case 'butter': return <Box key={i} p={[ix, y + 0.025, iz]} s={[0.1, 0.05, 0.06]} m={m} />
+          case 'eggs': return <Box key={i} p={[ix, y + 0.035, iz]} s={[0.1, 0.07, 0.15]} m={m} />
+          case 'veg': return <mesh key={i} material={m} position={[ix, y + 0.04, iz]}><sphereGeometry args={[0.04, 12, 10]} /></mesh>
+          case 'bowl': return <mesh key={i} material={m} position={[ix, y + 0.03, iz]}><cylinderGeometry args={[0.07, 0.05, 0.06, 18]} /></mesh>
+          default: return <Box key={i} p={[ix, y + 0.05, iz]} s={[0.12, 0.1, 0.12]} m={m} />
+        }
+      })}
+      {/* Lågen: hængslet i venstre side, med dørhylder på indersiden */}
+      <group ref={door} position={[-cw / 2 + 0.003, 0, D / 2 - 0.011]} userData={{ dynamic: true }}>
+        <group position={[cw / 2 - 0.003, 0, 0]} {...applianceClick(id)}>
+          <RoundedBox args={[cw - 0.006, H - 0.106, 0.022]} radius={0.005} smoothness={2} position={[0, (H + 0.1) / 2, 0]} material={f.white} castShadow />
+          <Box p={[cw / 2 - 0.05, 1.05, 0.02]} s={[0.018, 0.5, 0.018]} m={f.steel} />
+          {[0.6, 1.0, 1.4].map((y) => (
+            <group key={y}>
+              <Box p={[0, y, -0.06]} s={[cw - 0.08, 0.06, 0.09]} m={k.shelf} shadow={false} />
+              <mesh material={k.food[(y * 10) % 9 | 0]} position={[-0.1, y + 0.08, -0.06]}><cylinderGeometry args={[0.028, 0.03, 0.16, 12]} /></mesh>
+              <mesh material={k.food[((y * 10) % 9 | 0) + 1 > 8 ? 0 : ((y * 10) % 9 | 0) + 1]} position={[0.06, y + 0.06, -0.06]}><cylinderGeometry args={[0.025, 0.025, 0.12, 12]} /></mesh>
+            </group>
+          ))}
+        </group>
+      </group>
+    </group>
+  )
+}
+
+/** Søjle med overskab, Siemens-indbygningsovn i midten og tre skuffer i bunden. */
+function OvenColumn({ x, cw, H, D }: { x: number; cw: number; H: number; D: number }) {
+  const f = fm()
+  const k = kitchenMats()
+  const fz = D / 2 - 0.011
+  const gap = 0.004
+  const drawerH = (0.86 - 0.1) / 3
+  return (
+    <group position={[x, 0, 0]}>
+      <Box p={[0, H / 2, -0.022]} s={[cw, H, D - 0.022]} m={f.white} />
+      {/* Tre skuffer */}
+      {[0, 1, 2].map((i) => (
+        <group key={i}>
+          <RoundedBox args={[cw - 2 * gap, drawerH - 2 * gap, 0.022]} radius={0.004} smoothness={2} position={[0, 0.1 + drawerH * (i + 0.5), fz]} material={f.white} castShadow />
+          <Box p={[0, 0.1 + drawerH * (i + 1) - 0.035, fz + 0.016]} s={[0.3, 0.014, 0.014]} m={f.steel} />
+        </group>
+      ))}
+      {/* Ovn (sort glasfront, stålgreb, display) */}
+      <group position={[0, 0.86 + 0.3, fz]}>
+        <Box p={[0, 0, -0.002]} s={[cw - 2 * gap, 0.6 - 2 * gap, 0.026]} m={k.ovenGlass} />
+        <Box p={[0, 0.2, 0.024]} s={[cw - 0.1, 0.018, 0.018]} m={f.steel} />
+        <Box p={[0, 0.255, 0.0115]} s={[0.12, 0.028, 0.002]} m={k.display} shadow={false} />
+        {[-1, 1].map((s) => <mesh key={s} material={f.steel} position={[s * 0.17, 0.255, 0.016]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.018, 0.018, 0.012, 16]} /></mesh>)}
+        <mesh material={k.ovenGlass} position={[0, -0.06, 0.012]}><boxGeometry args={[cw - 0.12, 0.3, 0.002]} /></mesh>
+      </group>
+      {/* Overskab */}
+      <RoundedBox args={[cw - 2 * gap, H - 1.46 - 2 * gap, 0.022]} radius={0.004} smoothness={2} position={[0, 1.46 + (H - 1.46) / 2, fz]} material={f.white} castShadow />
+      <Box p={[cw / 2 - 0.05, 1.55, fz + 0.016]} s={[0.014, 0.16, 0.014]} m={f.steel} />
+    </group>
+  )
+}
+
+/** Fryser med fire fryseskuffer der glider ud når fryseren åbnes. */
+function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: number; D: number }) {
+  const f = fm()
+  const k = kitchenMats()
+  const drawers = useRef<(THREE.Group | null)[]>([])
+  const step = useApplianceOpen(id)
+  useFrame((_, dt) => {
+    const o = step(dt)
+    drawers.current.forEach((g, i) => { if (g) g.position.z = o * (0.36 - i * 0.04) })
+  })
+  const n = 4, top = H - 0.02, bottom = 0.12
+  const dh = (top - bottom) / n
+  return (
+    <group position={[x, 0, 0]}>
+      <Carcass cw={cw} H={H} D={D} />
+      <mesh material={k.frost} position={[0, H / 2, -D / 2 + 0.01]}><planeGeometry args={[cw - 0.04, H - 0.2]} /></mesh>
+      {Array.from({ length: n }, (_, i) => {
+        const yc = bottom + dh * (i + 0.5)
+        return (
+          <group key={i} ref={(g) => { drawers.current[i] = g }} userData={{ dynamic: true }}>
+            <group {...applianceClick(id)}>
+              {/* Front */}
+              <RoundedBox args={[cw - 0.008, dh - 0.008, 0.022]} radius={0.004} smoothness={2} position={[0, yc, D / 2 - 0.011]} material={f.white} castShadow />
+              <Box p={[0, yc + dh / 2 - 0.06, D / 2 + 0.006]} s={[0.3, 0.016, 0.016]} m={f.steel} />
+              {/* Skuffekasse med frostvarer */}
+              <Box p={[0, yc - dh / 2 + 0.02, 0]} s={[cw - 0.06, 0.012, D - 0.08]} m={k.frost} shadow={false} />
+              {[-1, 1].map((s) => <Box key={s} p={[s * (cw / 2 - 0.035), yc - dh / 2 + 0.12, 0]} s={[0.008, 0.22, D - 0.08]} m={k.shelf} shadow={false} />)}
+              <Box p={[-0.1, yc - dh / 2 + 0.07, -0.05]} s={[0.14, 0.09, 0.18]} m={k.food[(i * 3 + 2) % 9]} />
+              <Box p={[0.08, yc - dh / 2 + 0.06, 0.06]} s={[0.16, 0.07, 0.12]} m={k.food[(i * 3 + 5) % 9]} />
+              <mesh material={k.food[(i * 3 + 7) % 9]} position={[0.1, yc - dh / 2 + 0.08, -0.1]}><cylinderGeometry args={[0.05, 0.05, 0.11, 14]} /></mesh>
+            </group>
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+/** Natbord med én skuffe og en IKEA Tärnaby-lampe (antracit) ovenpå, der tændes/slukkes ved klik. Front mod +z. */
+function Nightstand({ lampId }: { lampId?: string }) {
+  const f = fm()
+  const W = 0.45, H = 0.5, D = 0.38
+  return (
+    <group>
+      <Box p={[0, H / 2 + 0.04, 0]} s={[W, H - 0.08, D]} m={f.whiteMatte} />
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => <Box key={`${x}${z}`} p={[x * (W / 2 - 0.03), 0.04, z * (D / 2 - 0.03)]} s={[0.03, 0.08, 0.03]} m={f.oak} />)}
+      <RoundedBox args={[W - 0.03, 0.16, 0.02]} radius={0.004} smoothness={2} position={[0, H - 0.1, D / 2 + 0.006]} material={f.whiteMatte} castShadow />
+      <mesh material={f.oak} position={[0, H - 0.1, D / 2 + 0.024]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.014, 0.014, 0.022, 14]} /></mesh>
+      {lampId && <TarnabyLamp id={lampId} position={[0.06, H, -0.04]} />}
+    </group>
+  )
+}
+
+/** Tärnaby: kegleformet fod, slank hals og hvælvet skærm i antracit. Klik tænder/slukker (delt via serveren). */
+function TarnabyLamp({ id, position }: { id: string; position: V3 }) {
+  const on = useStore((s) => s.snapshot?.openDoors.includes(id) ?? false)
+  const m = useMemo(() => ({
+    body: new THREE.MeshStandardMaterial({ color: '#3a3b3d', roughness: 0.55, metalness: 0.15 }),
+    glow: new THREE.MeshStandardMaterial({ color: '#fff3d6', emissive: '#ffd08a', emissiveIntensity: 0, toneMapped: false, side: THREE.DoubleSide }),
+  }), [])
+  m.glow.emissiveIntensity = on ? 3 : 0
+  return (
+    <group position={position} {...applianceClick(id)}>
+      <mesh material={m.body} position={[0, 0.03, 0]} castShadow><cylinderGeometry args={[0.035, 0.07, 0.06, 28]} /></mesh>
+      <mesh material={m.body} position={[0, 0.14, 0]} castShadow><cylinderGeometry args={[0.012, 0.018, 0.17, 14]} /></mesh>
+      <mesh material={m.body} position={[0, 0.235, 0]} castShadow><sphereGeometry args={[0.1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
+      <mesh material={m.glow} position={[0, 0.234, 0]} rotation={[Math.PI / 2, 0, 0]}><circleGeometry args={[0.098, 28]} /></mesh>
+      <pointLight position={[0, 0.18, 0]} color="#ffcf8a" intensity={on ? 2.2 : 0} distance={3} decay={1.8} />
+    </group>
+  )
+}
+
+/** Grå sovesofa: lige model med polstrede armlæn og to siddehynder. Lokalt: front mod +z. */
+function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85 }: { color?: string; w?: number; d?: number }) {
+  const f = fm()
+  const m = velour(color)
+  const arm = 0.17
+  const inner = w - 2 * arm
+  return (
+    <group>
+      <RoundedBox args={[w, 0.26, d]} radius={0.03} smoothness={3} position={[0, 0.23, 0]} material={m} castShadow receiveShadow />
+      {[-1, 1].map((s) => (
+        <RoundedBox key={s} args={[inner / 2 - 0.01, 0.16, d - 0.2]} radius={0.06} smoothness={4} position={[s * inner / 4, 0.44, 0.08]} material={m} castShadow receiveShadow />
+      ))}
+      <RoundedBox args={[inner, 0.42, 0.22]} radius={0.08} smoothness={4} position={[0, 0.6, -d / 2 + 0.13]} material={m} castShadow />
+      {[-1, 1].map((s) => (
+        <RoundedBox key={`a${s}`} args={[arm, 0.56, d]} radius={0.05} smoothness={3} position={[s * (w / 2 - arm / 2), 0.38, 0]} material={m} castShadow />
+      ))}
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+        <mesh key={`${x}${z}`} material={f.darkWood} position={[x * (w / 2 - 0.06), 0.05, z * (d / 2 - 0.06)]}><cylinderGeometry args={[0.02, 0.016, 0.1, 10]} /></mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Sort skab med to låger og sølvfarvede ludobrik-knopper. Lokalt: front mod +z. */
+function DoubleCabinet({ w = 0.9, h = 1.8, d = 0.45, color = '#141416' }: { w?: number; h?: number; d?: number; color?: string }) {
+  const body = useMemo(() => new THREE.MeshStandardMaterial({ color, roughness: 0.45 }), [color])
+  return (
+    <group>
+      <Box p={[0, h / 2, -0.011]} s={[w, h, d - 0.022]} m={body} />
+      <CabinetDoors w={w} h={h - 0.06} y0={0.06} z={d / 2 - 0.011} count={2} m={body} />
+      {[-1, 1].map((s) => <LudoKnob key={s} position={[s * 0.05, h * 0.52, d / 2 + 0.001]} silver />)}
+    </group>
+  )
+}
+
+let paintingTex: THREE.CanvasTexture | null = null
+/** Halvfærdigt abstrakt maleri: kraftige penselstrøg og farvefelter i den ene side, blyantsskitse på hvidt lærred i den anden. */
+function getPaintingTexture() {
+  if (paintingTex) return paintingTex
+  const c = document.createElement('canvas'); c.width = 300; c.height = 400
+  const ctx = c.getContext('2d')!
+  ctx.fillStyle = '#f4f1ea'; ctx.fillRect(0, 0, 300, 400)
+  let seed = 5
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  // Skitse (hele lærredet)
+  ctx.strokeStyle = 'rgba(80,80,80,0.35)'; ctx.lineWidth = 1
+  for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(60 + rnd() * 200, 60 + rnd() * 300, 20 + rnd() * 60, 0, Math.PI * 2); ctx.stroke() }
+  for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.moveTo(rnd() * 300, rnd() * 400); ctx.lineTo(rnd() * 300, rnd() * 400); ctx.stroke() }
+  // Malede felter, mest i venstre/øverste del
+  const colors = ['#1d3557', '#e63946', '#f4a261', '#2a9d8f', '#e9c46a', '#264653', '#c9184a']
+  ctx.save()
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(240, 0); ctx.bezierCurveTo(200, 140, 150, 220, 0, 330); ctx.closePath(); ctx.clip()
+  for (let i = 0; i < 26; i++) {
+    ctx.fillStyle = colors[Math.floor(rnd() * colors.length)]
+    ctx.globalAlpha = 0.65 + rnd() * 0.35
+    ctx.beginPath()
+    const x = rnd() * 260, y = rnd() * 320
+    ctx.ellipse(x, y, 20 + rnd() * 70, 8 + rnd() * 30, rnd() * Math.PI, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+  // Penselstrøg der løber ud på det hvide
+  ctx.globalAlpha = 0.9; ctx.lineCap = 'round'
+  for (let i = 0; i < 7; i++) {
+    ctx.strokeStyle = colors[i % colors.length]; ctx.lineWidth = 6 + rnd() * 10
+    ctx.beginPath(); const x = 80 + rnd() * 120, y = 120 + rnd() * 160
+    ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 40, y + rnd() * 60 - 30, x + 60 + rnd() * 50, y + rnd() * 80 - 40); ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+  paintingTex = new THREE.CanvasTexture(c); paintingTex.colorSpace = THREE.SRGBColorSpace
+  return paintingTex
+}
+
+/** Staffeli i lyst træ (trefod) med et halvfærdigt abstrakt maleri. Lokalt: maleriet vender mod +z. */
+function Easel() {
+  const m = useMemo(() => ({
+    wood: new THREE.MeshStandardMaterial({ color: '#c79a64', roughness: 0.7 }),
+    canvas: new THREE.MeshStandardMaterial({ map: getPaintingTexture(), roughness: 0.85 }),
+    edge: new THREE.MeshStandardMaterial({ color: '#efeae0', roughness: 0.9 }),
+  }), [])
+  const leg = (x: number, z: number, tilt: [number, number]) => (
+    <mesh material={m.wood} position={[x, 0.82, z]} rotation={[tilt[0], 0, tilt[1]]} castShadow><boxGeometry args={[0.035, 1.7, 0.03]} /></mesh>
+  )
+  return (
+    <group>
+      {leg(-0.22, 0.05, [-0.1, -0.13])}
+      {leg(0.22, 0.05, [-0.1, 0.13])}
+      {leg(0, -0.3, [0.32, 0])}
+      {/* Hylde lærredet står på + topklemme */}
+      <mesh material={m.wood} position={[0, 0.72, 0.1]} castShadow><boxGeometry args={[0.62, 0.025, 0.07]} /></mesh>
+      <group position={[0, 1.13, 0.11]} rotation={[-0.1, 0, 0]}>
+        <mesh material={m.edge} castShadow><boxGeometry args={[0.6, 0.8, 0.025]} /></mesh>
+        <mesh material={m.canvas} position={[0, 0, 0.0131]}><planeGeometry args={[0.6, 0.8]} /></mesh>
+      </group>
+      <mesh material={m.wood} position={[0, 1.55, 0.09]}><boxGeometry args={[0.12, 0.04, 0.05]} /></mesh>
+    </group>
+  )
+}
+
+/**
+ * Bænkpres-sæt: polstret bænk, rack med stangholdere og en olympisk stang med 76 kg
+ * (stang 20 kg + pr. side 20 + 5 + 2,5 + 0,5 kg). Lokalt: bænken langs z, racket ved -z.
+ */
+function BenchPress() {
+  const m = useMemo(() => ({
+    frame: new THREE.MeshStandardMaterial({ color: '#1b1c1e', roughness: 0.45, metalness: 0.6 }),
+    pad: new THREE.MeshStandardMaterial({ color: '#1e1e20', roughness: 0.6 }),
+    bar: new THREE.MeshStandardMaterial({ color: '#c8cbce', roughness: 0.25, metalness: 1 }),
+    p20: new THREE.MeshStandardMaterial({ color: '#2a5bd7', roughness: 0.5 }),
+    p5: new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5 }),
+    p25: new THREE.MeshStandardMaterial({ color: '#d93a3a', roughness: 0.5 }),
+    p05: new THREE.MeshStandardMaterial({ color: '#8c8f93', roughness: 0.4, metalness: 0.6 }),
+  }), [])
+  const rackZ = -0.5, barY = 1.05
+  // [radius, tykkelse, materiale] fra inderst til yderst
+  const plates: [number, number, THREE.Material][] = [[0.225, 0.055, m.p20], [0.115, 0.03, m.p5], [0.1, 0.022, m.p25], [0.07, 0.015, m.p05]]
+  return (
+    <group>
+      {/* Bænk */}
+      <Box p={[0, 0.42, 0.15]} s={[0.3, 0.08, 1.15]} m={m.pad} />
+      <Box p={[0, 0.19, -0.3]} s={[0.06, 0.38, 0.06]} m={m.frame} />
+      <Box p={[0, 0.19, 0.6]} s={[0.06, 0.38, 0.06]} m={m.frame} />
+      <Box p={[0, 0.03, -0.3]} s={[0.5, 0.05, 0.06]} m={m.frame} />
+      <Box p={[0, 0.03, 0.6]} s={[0.5, 0.05, 0.06]} m={m.frame} />
+      <Box p={[0, 0.34, 0.15]} s={[0.06, 0.06, 0.95]} m={m.frame} />
+      {/* Rack med to stolper og stangholdere */}
+      {[-1, 1].map((s) => (
+        <group key={s}>
+          <Box p={[s * 0.45, 0.65, rackZ]} s={[0.06, 1.3, 0.06]} m={m.frame} />
+          <Box p={[s * 0.45, 0.03, rackZ]} s={[0.07, 0.05, 0.6]} m={m.frame} />
+          <Box p={[s * 0.45, barY - 0.04, rackZ + 0.05]} s={[0.05, 0.04, 0.1]} m={m.frame} />
+        </group>
+      ))}
+      <Box p={[0, 0.03, rackZ]} s={[0.96, 0.05, 0.06]} m={m.frame} />
+      {/* Stang med skiver */}
+      <group position={[0, barY, rackZ + 0.05]}>
+        <mesh material={m.bar} rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.014, 0.014, 1.8, 12]} /></mesh>
+        {[-1, 1].map((s) => {
+          let x = 0.57
+          return (
+            <group key={s}>
+              <mesh material={m.bar} position={[s * 0.55, 0, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.03, 0.03, 0.03, 16]} /></mesh>
+              {plates.map(([r, t, mat], i) => {
+                const cx = x + t / 2
+                x += t + 0.002
+                return <mesh key={i} material={mat} position={[s * cx, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[r, r, t, 32]} /></mesh>
+              })}
+            </group>
+          )
+        })}
+      </group>
+    </group>
+  )
+}
+
+/** Firkantet hvidt bord med slanke metalben. */
+function SquareTable({ w = 0.75, h = 0.74 }: { w?: number; h?: number }) {
+  const f = fm()
+  return (
+    <group>
+      <Box p={[0, h - 0.015, 0]} s={[w, 0.03, w]} m={f.white} />
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+        <mesh key={`${x}${z}`} material={f.steel} position={[x * (w / 2 - 0.04), (h - 0.03) / 2, z * (w / 2 - 0.04)]} castShadow>
+          <cylinderGeometry args={[0.015, 0.015, h - 0.03, 12]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Lukket 3D-printer (Bambu Lab-stil): mørkt kabinet, glasfront og -låg, lille skærm, filamentspole på siden. Front mod +z. */
+function Printer3D() {
+  const m = useMemo(() => ({
+    body: new THREE.MeshStandardMaterial({ color: '#2a2c30', roughness: 0.4, metalness: 0.2 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#9aa3a8', roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false }),
+    bed: new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.6 }),
+    part: new THREE.MeshStandardMaterial({ color: '#2dbd6e', roughness: 0.6 }),
+    screen: new THREE.MeshStandardMaterial({ color: '#05070a', emissive: '#4fd1ff', emissiveIntensity: 0.6, toneMapped: false }),
+    spool: new THREE.MeshStandardMaterial({ color: '#2dbd6e', roughness: 0.5 }),
+  }), [])
+  const W = 0.4, H = 0.47, D = 0.42
+  return (
+    <group>
+      {[-1, 1].map((s) => <Box key={s} p={[s * (W / 2 - 0.02), H / 2, 0]} s={[0.04, H, D]} m={m.body} />)}
+      <Box p={[0, 0.03, 0]} s={[W, 0.06, D]} m={m.body} />
+      <Box p={[0, H / 2, -D / 2 + 0.015]} s={[W, H, 0.03]} m={m.body} />
+      <mesh material={m.glass} position={[0, H / 2 + 0.03, D / 2 - 0.003]}><boxGeometry args={[W - 0.08, H - 0.1, 0.006]} /></mesh>
+      <mesh material={m.glass} position={[0, H - 0.003, 0]}><boxGeometry args={[W, 0.006, D]} /></mesh>
+      <mesh material={m.bed} position={[0, 0.1, 0]}><boxGeometry args={[W - 0.1, 0.01, D - 0.1]} /></mesh>
+      <mesh material={m.part} position={[0, 0.14, 0]}><cylinderGeometry args={[0.05, 0.05, 0.07, 6]} /></mesh>
+      <Box p={[0, H - 0.08, 0]} s={[W - 0.1, 0.03, 0.03]} m={m.body} />
+      <Box p={[0.05, H - 0.1, 0.02]} s={[0.06, 0.06, 0.06]} m={m.body} />
+      <mesh material={m.screen} position={[-0.11, 0.04, D / 2 + 0.002]}><planeGeometry args={[0.1, 0.04]} /></mesh>
+      <mesh material={m.spool} position={[W / 2 + 0.04, H * 0.6, -0.05]} rotation={[0, 0, Math.PI / 2]} castShadow><cylinderGeometry args={[0.1, 0.1, 0.07, 24]} /></mesh>
+    </group>
+  )
+}
+
+/** Rundt havebord i teak: lamelplade på et kryds af ben. */
+function RoundTable({ d = 0.7, color = '#a8743f' }: { d?: number; color?: string }) {
+  const wood = useMemo(() => new THREE.MeshStandardMaterial({ color, roughness: 0.65 }), [color])
+  const r = d / 2, H = 0.72
+  return (
+    <group>
+      <mesh material={wood} position={[0, H - 0.015, 0]} castShadow receiveShadow><cylinderGeometry args={[r, r, 0.03, 40]} /></mesh>
+      {[-2, -1, 0, 1, 2].map((k) => <Box key={k} p={[k * d * 0.18, H + 0.0006, 0]} s={[0.004, 0.001, Math.sqrt(Math.max(0, r * r - (k * d * 0.18) ** 2)) * 2 - 0.02]} m={fm().darkWood} shadow={false} />)}
+      {[0, Math.PI / 2].map((a) => (
+        <group key={a} rotation={[0, a + Math.PI / 4, 0]}>
+          {[-1, 1].map((s) => <mesh key={s} material={wood} position={[s * r * 0.55, (H - 0.03) / 2, 0]} rotation={[0, 0, -s * 0.18]} castShadow><boxGeometry args={[0.04, H - 0.02, 0.04]} /></mesh>)}
+        </group>
+      ))}
+    </group>
+  )
+}
+
 const colorMats = new Map<string, THREE.MeshStandardMaterial>()
 const colorMat = (hex: string) => {
   let m = colorMats.get(hex)
@@ -1493,6 +2021,12 @@ export interface FurnitureItem {
   /** Benhøjde i meter (0 = ingen ben). */
   legs?: number
   contents?: string
+  /** Model: navne (endelser) på dele der skjules. */
+  hide?: string[]
+  /** Håndvask: stort spejl med lysrør. */
+  bigMirror?: boolean
+  /** Natbord: id på lampen ovenpå (tænd/sluk via serveren). */
+  lamp?: string
   /** Brug samme stof/farve som møblet med dette id. */
   matchFabric?: string
   /** Kabel: punkter [x, y, z] i verdenskoordinater. */
@@ -1520,14 +2054,16 @@ function fabricColor(it: FurnitureItem, fallback: string): string {
 function renderItem(it: FurnitureItem): ReactNode {
   const f = fm()
   switch (it.kind) {
-    case 'model': return <Model name={it.model!} p={O} height={it.height} width={it.width} />
+    case 'model': return <Model name={it.model!} p={O} height={it.height} width={it.width} hide={it.hide} />
+    case 'roundTable': return <RoundTable d={it.w} color={it.color} />
     case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} />
     case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} />
     case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
     case 'toilet': return <Toilet p={O} />
-    case 'vanity': return <Vanity p={O} w={it.w} />
+    case 'vanity': return <Vanity p={O} w={it.w} bigMirror={it.bigMirror} />
+    case 'showerNiche': return <ShowerNiche w={it.w} d={it.d} />
     case 'bathtub': return <Bathtub p={O} />
     case 'shower': return <Shower p={O} />
     case 'woodStove': return <WoodStove p={O} />
@@ -1543,6 +2079,14 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'outdoorTable': return <OutdoorTable l={it.w} d={it.d} color={it.color} />
     case 'gardenChair': return <GardenChair color={it.color} />
     case 'gasGrill': return <GasGrill w={it.w} />
+    case 'espresso': return <EspressoMachine />
+    case 'nightstand': return <Nightstand lampId={it.lamp} />
+    case 'sleeperSofa': return <SleeperSofa color={it.color} w={it.w} d={it.d} />
+    case 'doubleCabinet': return <DoubleCabinet w={it.w} h={it.height} d={it.d} color={it.color} />
+    case 'easel': return <Easel />
+    case 'benchPress': return <BenchPress />
+    case 'squareTable': return <SquareTable w={it.w} />
+    case 'printer3d': return <Printer3D />
     case 'dropTable': return <DropTable l={it.w} d={it.d} />
     case 'wingChair': return <WingChair color={it.color ?? '#b47a22'} />
     case 'chaiseSofa': return <ChaiseSofa color={fabricColor(it, '#2340a8')} w={it.w} side={it.side} />
@@ -1550,7 +2094,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'walkInShelves': return <WalkInShelves p={O} w={it.w ?? 1.8} />
     case 'kitchenRun': return <KitchenRun length={it.length ?? 3} />
     case 'counter': return <Counter length={it.length ?? 2} />
-    case 'tallCabinets': return <TallCabinets w={it.w ?? 2} />
+    case 'tallCabinets': return <KitchenTall w={it.w ?? 2.2} />
     case 'kitchenIsland': return <KitchenIsland />
     case 'diningTable': return <DiningTable w={it.w ?? 2} d={it.d ?? 0.9} />
     case 'washerDryer': return <WasherDryer />

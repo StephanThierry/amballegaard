@@ -81,6 +81,23 @@ public static class Speech
     public static readonly IReadOnlyList<string> PickedUpLines = ["Hov! Sæt mig ned!", "Wiii!", "Hvor skal vi hen?", "Jeg kan altså godt selv gå!", "Uha, det kilder!"];
     public static readonly IReadOnlyList<string> DogPickedUpLines = ["Vuf?!", "*piber*", "*logrer forvirret*"];
 
+    public static readonly IReadOnlyList<string> FridgeLines =
+    [
+        "Hvem har drukket den sidste mælk?!", "Uhm… rester fra i går!", "Vi mangler altså smør.", "Er den ost stadig god?",
+        "Hvor er yoghurten?", "Jeg tager lige en gulerod.", "Hvem har sat en tom juicekarton tilbage?", "Der er intet at spise!",
+    ];
+    public static readonly IReadOnlyList<string> FreezerLines =
+    [
+        "Er der mere is?", "Pizza i aften? Der ligger en her!", "Brrr, koldt!", "Hvem har spist alle isvaflerne?",
+        "Vi skal huske at afrime fryseren.", "Fiskefrikadeller… igen?",
+    ];
+
+    public static string Appliance(string kind, Random rng)
+    {
+        var pool = kind == "freezer" ? FreezerLines : FridgeLines;
+        return pool[rng.Next(pool.Count)];
+    }
+
     public static string Random(Agent a, Random rng)
     {
         if (a.Kind == AgentKind.Dog) return DogLines[rng.Next(DogLines.Count)];

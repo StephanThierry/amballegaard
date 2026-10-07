@@ -16,6 +16,7 @@ public sealed record HouseModel
     public required List<OpeningDef> Openings { get; init; }
     public required List<RoomDef> Rooms { get; init; }
     public SiteDef? Site { get; init; }
+    public List<ApplianceDef> Appliances { get; init; } = [];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -31,6 +32,12 @@ public sealed record HouseModel
 }
 
 public sealed record SiteDef(double[][] Bounds);
+
+/// <summary>Køleskab/fryser m.m. der kan åbnes; <c>StandAt</c> er hvor en beboer stiller sig for at åbne det.</summary>
+public sealed record ApplianceDef(string Id, string Kind, double[] StandAt)
+{
+    [JsonIgnore] public Vec2 Stand => new(StandAt[0], StandAt[1]);
+}
 
 public sealed record WallDef(string Id, double[] A, double[] B, double? Thickness = null);
 
