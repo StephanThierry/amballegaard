@@ -2,7 +2,7 @@
 
 3D-isometrisk model af huset med autonome beboere. Se README.md for kørsel og struktur.
 
-## Indsatte vektorer → flyt møbler
+## Indsatte vektorer → placér møbler
 
 Brugeren tegner vektorer i appen (📐 Vektor / tasten V) og indsætter tekst som:
 
@@ -13,14 +13,16 @@ Til: x=18.60, z=13.80 (Stue)
 Vektor: Δx=+1.75, Δz=+2.40 m · længde 2.97 m · retning 36°
 ```
 
-Sådan tolkes den:
-- Møblet med det angivne `id` i `data/furniture.json` er det, der skal flyttes. Typisk sættes `pos` til `Til`-punktet
-  (eller `pos + Δ`, hvis brugeren greb møblet langt fra dets centrum og mener en relativ flytning — spørg hvis tvivl).
-- "retning" bruger samme konvention som `rot`: 0° = +z (nedad på plantegningen), 90° = +x. Siger brugeren
-  "drej den så den vender sådan", sættes `rot` til retningen.
-- Uden møbel-id er vektoren en position/retning til et nyt møbel, eller den henviser til de nævnte "nær"-møbler.
-- Tjek at møblet ikke havner i en væg: vægge og rum står i `data/house.json` (koordinater = vægmidterlinjer;
-  ydervægge 0,34 m tykke, indervægge 0,12 m). Brug møblets mål (se komponenterne i `web/src/three/Furniture.tsx`).
+Sådan tolkes den (aftalt med brugeren 2026-10-07):
+- **Startpunktet er ankeret.** Møblet skal stå ved startpunktet. Starter vektoren ved en væg ("Væg ved start" er lille),
+  skal møblets **bagside stå mod den væg**: placér centrum = vægflade + normal × (dybde/2).
+- **Retningen er møblets front** (hvor man står/kigger fra, fx hvor en skærm vender hen, hvor man sidder fra).
+  Rund **altid af til nærmeste 45°** (fx 88° → 90°, 40° → 45°) — et møbel står aldrig et par grader skævt. Brug den foreslåede `rot`.
+- **Længden og "Til"-punktet er normalt ligegyldige.** Brug kun "Til" som mål, hvis brugeren skriver "flyt hertil".
+- Starter vektoren **på et møbel**, er det møblet der menes (flyt/drej det), men samme regel gælder: start = ny plads,
+  retning = front.
+- Tjek at møblet ikke havner i en væg eller andre møbler (vægge i `data/house.json`, koordinater = vægmidterlinjer;
+  ydervægge 0,34 m, indervægge 0,12 m). Brug møblets mål (komponenterne i `web/src/three/Furniture.tsx`).
 - Vite hot-reloader `data/furniture.json`, så ændringen ses straks i browseren.
 
 ## Konventioner

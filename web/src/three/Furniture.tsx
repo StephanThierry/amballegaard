@@ -265,15 +265,90 @@ function Stool({ p }: { p: V3 }) {
   )
 }
 
-function Toilet({ p, rot = 0 }: { p: V3; rot?: number }) {
+/**
+ * Væghængt toilet i stil med Ifö Spira: blød, afrundet skål der hænger fri af gulvet, tyndt sæde og låg
+ * (klik løfter låget op mod væggen), skylleplade med to runde knapper og toiletrulleholder i messing.
+ * Lokalt: væggen ved z = -0.21, skålen peger mod +z.
+ */
+function Toilet({ id }: { id?: string }) {
   const f = fm()
-  // Væghængt toilet; væg ved -z
+  const lid = useRef<THREE.Group>(null)
+  const step = useApplianceOpen(id ?? '')
+  useFrame((_, dt) => { if (lid.current) lid.current.rotation.x = -step(dt) * 1.62 })
+  const geo = useMemo(() => {
+    // Skålen bygges som en loft af vandrette tværsnit der følger lågets ellipse: fronten er en halv ellipse,
+    // bagenden går helt ind til væggen. Nedad bliver tværsnittet smallere og trækker sig ind mod væggen.
+    const N = 16, M = 56, yTop = 0.395, yBot = 0.19
+    const pos: number[] = [], idx: number[] = []
+    const level = (t: number) => {
+      const e = Math.pow(t, 1.6)
+      return { y: yTop - (yTop - yBot) * t, rx: 0.178 * (1 - 0.42 * e), rzF: 0.258 * (1 - 0.48 * Math.pow(t, 1.3)), cz: 0.28 - 0.09 * e }
+    }
+    for (let i = 0; i <= N; i++) {
+      const r = level(i / N)
+      for (let j = 0; j < M; j++) {
+        const th = (j / M) * Math.PI * 2
+        const c = Math.cos(th)
+        const rz = c >= 0 ? r.rzF : r.cz // bagud helt til væggen (z = 0)
+        pos.push(r.rx * Math.sin(th), r.y, r.cz + rz * c)
+      }
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) {
+      const a0 = i * M + j, a1 = i * M + ((j + 1) % M), b0 = a0 + M, b1 = a1 + M
+      idx.push(a0, b0, a1, a1, b0, b1)
+    }
+    // Top- og bundlåg
+    const topC = pos.length / 3; pos.push(0, yTop, level(0).cz)
+    const botC = pos.length / 3; pos.push(0, yBot, level(1).cz)
+    for (let j = 0; j < M; j++) {
+      idx.push(topC, j, (j + 1) % M)
+      idx.push(botC, N * M + ((j + 1) % M), N * M + j)
+    }
+    const body = new THREE.BufferGeometry()
+    body.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+    body.setIndex(idx)
+    body.computeVertexNormals()
+    const ellipse = (rx: number, rz: number) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0); return s }
+    const ring = ellipse(0.175, 0.255); ring.holes.push(ellipse(0.115, 0.165) as unknown as THREE.Path)
+    const flat = (s: THREE.Shape, t: number) => { const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 40 }); g.rotateX(-Math.PI / 2); return g }
+    return { body, seat: flat(ring, 0.012), lid: flat(ellipse(0.178, 0.258), 0.012), hole: new THREE.ShapeGeometry(ellipse(0.115, 0.165), 40).rotateX(-Math.PI / 2) }
+  }, [])
+  const m = useMemo(() => ({
+    inner: new THREE.MeshStandardMaterial({ color: '#d9dfe3', roughness: 0.2 }),
+    brass: new THREE.MeshStandardMaterial({ color: '#b8915a', roughness: 0.35, metalness: 0.9 }),
+    paper: new THREE.MeshStandardMaterial({ color: '#f7f6f2', roughness: 0.9 }),
+  }), [])
+  const seatZ = 0.28
   return (
-    <At p={p} rot={rot}>
-      <mesh material={f.porcelain} position={[0, 0.38, 0.05]} scale={[0.19, 0.12, 0.28]} castShadow><sphereGeometry args={[1, 20, 12]} /></mesh>
-      <Box p={[0, 0.3, -0.15]} s={[0.36, 0.2, 0.12]} m={f.porcelain} />
-      <Box p={[0, 1.0, -0.2]} s={[0.22, 0.14, 0.02]} m={f.white} />
-    </At>
+    <group position={[0, 0, -0.21]}>
+      <mesh geometry={geo.body} material={f.porcelain} castShadow receiveShadow />
+      {/* Skålens åbning (ses når låget er oppe) */}
+      <mesh geometry={geo.hole} material={m.inner} position={[0, 0.396, seatZ]} />
+      <mesh geometry={geo.seat} material={f.porcelain} position={[0, 0.4, seatZ]} castShadow />
+      {/* Låg: hængslet bagtil, klik løfter det op mod væggen */}
+      <group ref={lid} position={[0, 0.422, 0.04]}>
+        <group {...(id ? applianceClick(id) : {})}>
+          <mesh geometry={geo.lid} material={f.porcelain} position={[0, 0, seatZ - 0.04]} castShadow />
+        </group>
+      </group>
+      {[-1, 1].map((s) => <mesh key={s} material={f.porcelain} position={[s * 0.09, 0.42, 0.035]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.012, 0.012, 0.04, 12]} /></mesh>)}
+      {/* Skylleplade med to runde knapper */}
+      <group position={[0, 1.05, 0.006]}>
+        <mesh material={f.white} castShadow><boxGeometry args={[0.24, 0.16, 0.012]} /></mesh>
+        {[[-0.025, 0.04], [0.045, 0.028]].map(([x, r]) => (
+          <group key={x} position={[x, 0, 0.007]} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh material={f.steel}><torusGeometry args={[r, 0.004, 8, 32]} /></mesh>
+            <mesh material={f.white}><cylinderGeometry args={[r - 0.003, r - 0.003, 0.004, 32]} /></mesh>
+          </group>
+        ))}
+      </group>
+      {/* Toiletrulleholder i messing på væggen ved siden af */}
+      <group position={[-0.42, 0.7, 0]}>
+        <mesh material={m.brass} position={[0, 0, 0.04]}><boxGeometry args={[0.02, 0.025, 0.08]} /></mesh>
+        <mesh material={m.brass} position={[0.06, 0, 0.075]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.008, 0.008, 0.12, 10]} /></mesh>
+        <mesh material={m.paper} position={[0.065, -0.005, 0.075]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.055, 0.055, 0.1, 24]} /></mesh>
+      </group>
+    </group>
   )
 }
 
@@ -338,13 +413,51 @@ function ShowerNiche({ w = 1.0, d = 1.0 }: { w?: number; d?: number }) {
   )
 }
 
+/** Afrundet rektangel som THREE.Shape (centreret). */
+function roundedRectShape(w: number, d: number, r: number) {
+  const sh = new THREE.Shape(), x = -w / 2, y = -d / 2
+  sh.moveTo(x + r, y); sh.lineTo(x + w - r, y); sh.quadraticCurveTo(x + w, y, x + w, y + r)
+  sh.lineTo(x + w, y + d - r); sh.quadraticCurveTo(x + w, y + d, x + w - r, y + d)
+  sh.lineTo(x + r, y + d); sh.quadraticCurveTo(x, y + d, x, y + d - r)
+  sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y)
+  return sh
+}
+
+/** Fritstående-look indbygningsbadekar: afrundet kar med hul indvendig skål, bred kant, vand, armatur og afløb. Lokalt: langs x. */
 function Bathtub({ p, rot = 0 }: { p: V3; rot?: number }) {
   const f = fm()
-  const m = getMaterials()
+  const W = 1.75, D = 0.78, H = 0.56
+  const geo = useMemo(() => {
+    const outer = roundedRectShape(W, D, 0.16)
+    outer.holes.push(roundedRectShape(W - 0.16, D - 0.16, 0.24) as unknown as THREE.Path)
+    const shell = new THREE.ExtrudeGeometry(outer, { depth: H - 0.02, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 4, curveSegments: 20 })
+    shell.rotateX(-Math.PI / 2)
+    // Skålens bund (lidt mindre, så væggene ser ud til at hælde indad)
+    const floor = new THREE.ShapeGeometry(roundedRectShape(W - 0.36, D - 0.3, 0.18), 20)
+    floor.rotateX(-Math.PI / 2)
+    const water = new THREE.ShapeGeometry(roundedRectShape(W - 0.18, D - 0.18, 0.23), 20)
+    water.rotateX(-Math.PI / 2)
+    return { shell, floor, water }
+  }, [])
+  const m = useMemo(() => ({
+    inner: new THREE.MeshStandardMaterial({ color: '#f4f6f7', roughness: 0.15 }),
+    water: new THREE.MeshPhysicalMaterial({ color: '#9fd0e6', roughness: 0.05, transparent: true, opacity: 0.45, depthWrite: false, clearcoat: 1 }),
+  }), [])
   return (
     <At p={p} rot={rot}>
-      <Box p={[0, 0.28, 0]} s={[1.75, 0.56, 0.75]} m={f.porcelain} />
-      <mesh material={m.glass} position={[0, 0.57, 0]}><boxGeometry args={[1.6, 0.01, 0.6]} /></mesh>
+      <mesh geometry={geo.shell} material={f.porcelain} position={[0, 0.02, 0]} castShadow receiveShadow />
+      {/* Indvendige skrå vægge antydet med en lav skål og bunden */}
+      <mesh geometry={geo.floor} material={m.inner} position={[0, 0.1, 0]} receiveShadow />
+      <mesh geometry={geo.water} material={m.water} position={[0, 0.4, 0]} />
+      {/* Afløb og overløb */}
+      <mesh material={f.steel} position={[W / 2 - 0.3, 0.103, 0]}><cylinderGeometry args={[0.03, 0.03, 0.004, 20]} /></mesh>
+      <mesh material={f.steel} position={[W / 2 - 0.085, 0.42, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.025, 0.025, 0.006, 20]} /></mesh>
+      {/* Armatur på kanten i fodenden */}
+      <group position={[W / 2 - 0.05, H, 0]}>
+        <mesh material={f.steel} position={[0, 0.04, 0]}><cylinderGeometry args={[0.018, 0.022, 0.08, 14]} /></mesh>
+        <mesh material={f.steel} position={[-0.06, 0.08, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.013, 0.013, 0.13, 12]} /></mesh>
+        {[-1, 1].map((s) => <mesh key={s} material={f.steel} position={[0, 0.03, s * 0.09]}><cylinderGeometry args={[0.02, 0.02, 0.05, 12]} /></mesh>)}
+      </group>
     </At>
   )
 }
@@ -612,19 +725,26 @@ function PcTower() {
 }
 
 /** Skuffedarie: sort korpus med skuffefronter i kirsebærtræ. Lokalt: front mod +z. */
-function Dresser({ w = 1.0, h = 0.8, d = 0.45, drawers = 4, color = '#141414', fronts = '#8a3a22' }: {
-  w?: number; h?: number; d?: number; drawers?: number; color?: string; fronts?: string
+function Dresser({ w = 1.0, h = 0.8, d = 0.45, drawers = 4, color = '#141414', fronts = '#8a3a22', legs = 0 }: {
+  w?: number; h?: number; d?: number; drawers?: number; color?: string; fronts?: string; legs?: number
 }) {
   const m = useMemo(() => ({
     body: new THREE.MeshStandardMaterial({ color, roughness: 0.4 }),
     wood: new THREE.MeshStandardMaterial({ color: fronts, roughness: 0.45 }),
   }), [color, fronts])
-  const plinth = 0.06, frame = 0.025
+  // Med ben (legs > 0) står korpus hævet på fire ben i stedet for på en sokkel.
+  const plinth = legs > 0 ? legs : 0.06, frame = 0.025
   const fh = (h - plinth - frame * (drawers + 1)) / drawers
   return (
     <group>
       <Box p={[0, plinth + (h - plinth) / 2, 0]} s={[w, h - plinth, d]} m={m.body} />
-      <Box p={[0, plinth / 2, -0.02]} s={[w - 0.04, plinth, d - 0.06]} m={m.body} />
+      {legs > 0
+        ? [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+            <mesh key={`${x}${z}`} material={m.body} position={[x * (w / 2 - 0.04), legs / 2, z * (d / 2 - 0.04)]} castShadow>
+              <cylinderGeometry args={[0.018, 0.012, legs, 12]} />
+            </mesh>
+          ))
+        : <Box p={[0, plinth / 2, -0.02]} s={[w - 0.04, plinth, d - 0.06]} m={m.body} />}
       {Array.from({ length: drawers }, (_, i) => {
         const y = plinth + frame + i * (fh + frame) + fh / 2
         return (
@@ -2027,7 +2147,8 @@ function Printer3D() {
       <Box p={[0, 0.03, 0]} s={[W, 0.06, D]} m={m.body} />
       <Box p={[0, H / 2, -D / 2 + 0.015]} s={[W, H, 0.03]} m={m.body} />
       <mesh material={m.glass} position={[0, H / 2 + 0.03, D / 2 - 0.003]}><boxGeometry args={[W - 0.08, H - 0.1, 0.006]} /></mesh>
-      <mesh material={m.glass} position={[0, H - 0.003, 0]}><boxGeometry args={[W, 0.006, D]} /></mesh>
+      {/* Glaslåg mellem sidevæggene (ikke oven på dem), så fladerne ikke falder sammen */}
+      <mesh material={m.glass} position={[0, H - 0.006, 0.005]}><boxGeometry args={[W - 0.081, 0.006, D - 0.041]} /></mesh>
       <mesh material={m.bed} position={[0, 0.1, 0]}><boxGeometry args={[W - 0.1, 0.01, D - 0.1]} /></mesh>
       <mesh material={m.part} position={[0, 0.14, 0]}><cylinderGeometry args={[0.05, 0.05, 0.07, 6]} /></mesh>
       <Box p={[0, H - 0.08, 0]} s={[W - 0.1, 0.03, 0.03]} m={m.body} />
@@ -2052,6 +2173,79 @@ function RoundTable({ d = 0.7, color = '#a8743f' }: { d?: number; color?: string
         </group>
       ))}
     </group>
+  )
+}
+
+/** Stort firkantet vægspejl med smal sort ramme. Front mod +z, centreret i højden y. */
+function WallMirror({ w = 0.75, h = 0.75 }: { w?: number; h?: number }) {
+  const f = fm()
+  return (
+    <WallMounted>
+      <Box p={[0, 0, 0.012]} s={[w, h, 0.024]} m={f.darkWood} />
+      <Box p={[0, 0, 0.026]} s={[w - 0.04, h - 0.04, 0.004]} m={f.mirror} shadow={false} />
+    </WallMounted>
+  )
+}
+
+/** Lille indrammet familiefoto på væggen. */
+function WallPicture({ w = 0.24, h = 0.32, photo = 0 }: { w?: number; h?: number; photo?: number }) {
+  const mats = useMemo(() => {
+    const ph = getPhotoTextures()
+    return { frame: new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.45 }), photo: new THREE.MeshBasicMaterial({ map: ph[photo % ph.length], toneMapped: false }) }
+  }, [photo])
+  return (
+    <WallMounted>
+      <mesh material={mats.frame} position={[0, 0, 0.01]} castShadow><boxGeometry args={[w, h, 0.02]} /></mesh>
+      <mesh material={mats.photo} position={[0, 0, 0.0205]}><planeGeometry args={[w - 0.04, h - 0.04]} /></mesh>
+    </WallMounted>
+  )
+}
+
+/** Skoreol i to etager: hvide træender med rammer og stålrør som hylder, plus et par sko. Front mod +z. */
+function ShoeRack({ w = 0.9, h = 0.45, d = 0.3 }: { w?: number; h?: number; d?: number }) {
+  const f = fm()
+  const shoe = useMemo(() => [new THREE.MeshStandardMaterial({ color: '#2b2522', roughness: 0.5 }), new THREE.MeshStandardMaterial({ color: '#8a5a32', roughness: 0.6 }), new THREE.MeshStandardMaterial({ color: '#e9e6e0', roughness: 0.7 })], [])
+  const tube = useMemo(() => new THREE.CylinderGeometry(0.008, 0.008, w - 0.05, 10).rotateZ(Math.PI / 2), [w])
+  const tiers = [0.08, h - 0.02]
+  return (
+    <group>
+      {[-1, 1].map((sx) => (
+        <group key={sx} position={[sx * (w / 2 - 0.015), 0, 0]}>
+          {[-1, 1].map((sz) => <Box key={sz} p={[0, h / 2, sz * (d / 2 - 0.015)]} s={[0.03, h, 0.03]} m={f.white} />)}
+          {tiers.map((y) => <Box key={y} p={[0, y, 0]} s={[0.03, 0.03, d]} m={f.white} />)}
+        </group>
+      ))}
+      {tiers.map((y) => [-0.105, -0.035, 0.035, 0.105].map((z) => <mesh key={y + ':' + z} geometry={tube} material={f.steel} position={[0, y + 0.01, z * d / 0.3]} />))}
+      {/* Hvid topplade der lukker reolen af */}
+      <Box p={[0, h + 0.009, 0]} s={[w, 0.018, d + 0.01]} m={f.white} />
+      {/* Sko på den nederste hylde */}
+      {[[-0.22, tiers[0], 0], [0.18, tiers[0], 1]].map(([x, y, c], i) => (
+        <group key={i} position={[x, y + 0.025, 0]}>
+          {[-0.05, 0.05].map((dx) => (
+            <group key={dx} position={[dx, 0, 0]}>
+              <RoundedBox args={[0.085, 0.05, 0.25]} radius={0.02} smoothness={2} position={[0, 0.02, 0]} material={shoe[c]} castShadow />
+              <RoundedBox args={[0.08, 0.06, 0.09]} radius={0.025} smoothness={2} position={[0, 0.05, -0.07]} material={shoe[c]} />
+            </group>
+          ))}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+/** KNAX-knagerække: sort træliste med lysegrå vippeknager i aluminium. Front mod +z. */
+function Knax({ hooks = 4, w = 0.4 }: { hooks?: number; w?: number }) {
+  const m = useMemo(() => ({
+    wood: new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.6 }),
+    alu: new THREE.MeshStandardMaterial({ color: '#c9ccce', roughness: 0.35, metalness: 0.8 }),
+  }), [])
+  return (
+    <WallMounted>
+      <Box p={[0, 0, 0.0125]} s={[w, 0.07, 0.025]} m={m.wood} />
+      {Array.from({ length: hooks }, (_, i) => (
+        <Box key={i} p={[-w / 2 + (w / hooks) * (i + 0.5), 0, 0.026]} s={[0.02, 0.066, 0.003]} m={m.alu} shadow={false} />
+      ))}
+    </WallMounted>
   )
 }
 
@@ -2125,7 +2319,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
-    case 'toilet': return <Toilet p={O} />
+    case 'toilet': return <Toilet id={it.id} />
     case 'vanity': return <Vanity p={O} w={it.w} bigMirror={it.bigMirror} />
     case 'showerNiche': return <ShowerNiche w={it.w} d={it.d} />
     case 'bathtub': return <Bathtub p={O} />
@@ -2151,6 +2345,10 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'benchPress': return <BenchPress />
     case 'squareTable': return <SquareTable w={it.w} />
     case 'printer3d': return <Printer3D />
+    case 'wallMirror': return <WallMirror w={it.w} h={it.height} />
+    case 'wallPicture': return <WallPicture w={it.w} h={it.height} photo={it.count} />
+    case 'shoeRack': return <ShoeRack w={it.w} h={it.height} d={it.d} />
+    case 'knax': return <Knax hooks={it.count} w={it.w} />
     case 'dropTable': return <DropTable l={it.w} d={it.d} />
     case 'wingChair': return <WingChair color={it.color ?? '#b47a22'} />
     case 'chaiseSofa': return <ChaiseSofa color={fabricColor(it, '#2340a8')} w={it.w} side={it.side} />
@@ -2166,7 +2364,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'workDesk': return <WorkDesk l={it.w ?? 1.6} d={it.d ?? 0.8} color={it.color} />
     case 'pcTower': return <PcTower />
     case 'keyboardMouse': return <KeyboardMouse glow={it.color} />
-    case 'dresser': return <Dresser w={it.w} h={it.height} d={it.d} color={it.color} fronts={it.fronts} />
+    case 'dresser': return <Dresser w={it.w} h={it.height} d={it.d} color={it.color} fronts={it.fronts} legs={it.legs} drawers={it.count} />
     case 'bookshelf': return <Bookshelf w={it.w} h={it.height} d={it.d} color={it.color} />
     case 'dogBed': return <Box p={[0, 0.06, 0]} s={[0.9, 0.12, 0.65]} m={f.dogBed} />
     case 'rug': return <Box p={[0, 0.006, 0]} s={[it.w ?? 1, 0.012, it.d ?? 1]} m={colorMat(it.color ?? '#cfc5b4')} shadow={false} />

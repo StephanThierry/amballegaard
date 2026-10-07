@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import type { House, P2, VectorRec } from '../types'
 import { setControlsEnabled } from './camera'
 import { furnitureItems } from './Furniture'
-import { pointInPolygon } from './layout'
+import { layoutWalls, pointInPolygon } from './layout'
 
 const round = (v: number) => Math.round(v * 100) / 100
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
@@ -144,7 +144,26 @@ export function vectorText(v: VectorRec, house: House) {
     `Til: x=${fmt(v.end[0])}, z=${fmt(v.end[1])} (${roomName(house, v.end)})` +
       (endNear.length ? ` — nær: ${endNear.map((x) => `id="${x.it.id}" (${x.d.toFixed(2)} m)`).join(', ')}` : ''),
     `Vektor: Δx=${signed(dx)}, Δz=${signed(dz)} m · længde ${len.toFixed(2)} m · retning ${dir}°`,
+    wallLine(house, v.start, dir),
     `(Koordinater i meter som i data/house.json og data/furniture.json; retning bruger samme konvention som "rot": 0° = +z/nedad på plantegningen, 90° = +x/højre.)`,
   ]
   return lines.join('\n')
+}
+
+/** Nærmeste vægflade ved startpunktet og den rot et møbel får, hvis bagsiden står mod den og fronten peger som vektoren. */
+function wallLine(house: House, p: P2, dir: number) {
+  let best: { d: number; face: P2; normal: P2 } | null = null
+  for (const seg of layoutWalls(house)) {
+    const rx = p[0] - seg.a[0], rz = p[1] - seg.a[1]
+    const t = Math.max(0, Math.min(seg.len, rx * seg.dir[0] + rz * seg.dir[1]))
+    const cx = seg.a[0] + seg.dir[0] * t, cz = seg.a[1] + seg.dir[1] * t
+    const side = Math.sign(rx * seg.n[0] + rz * seg.n[1]) || 1
+    const dist = Math.hypot(p[0] - cx, p[1] - cz) - seg.thickness / 2
+    if (!best || dist < best.d) best = { d: dist, face: [cx + seg.n[0] * side * seg.thickness / 2, cz + seg.n[1] * side * seg.thickness / 2], normal: [seg.n[0] * side, seg.n[1] * side] }
+  }
+  if (!best) return ''
+  const wallDir = Math.round((Math.atan2(best.normal[0], best.normal[1]) * 180) / Math.PI)
+  // Altid nærmeste 45° — ingen møbler står med et par graders skævhed.
+  const snapped = Math.round(dir / 45) * 45
+  return `Væg ved start: ${best.d.toFixed(2)} m væk, vægflade ved x=${fmt(best.face[0])}, z=${fmt(best.face[1])}, væggens normal peger ${wallDir}° · front-retning ${dir}° → rot ${snapped === -180 ? 180 : snapped}° (nærmeste 45°)`
 }
