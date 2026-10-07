@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Amballegaard.Simulation\Amballegaard.Simulation.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Kør via "dotnet Amballegaard.Server.dll" — Windows blokerer ellers den usignerede apphost-exe efter rebuild. -->
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+</Project>

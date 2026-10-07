@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Amballegaard.Server/Amballegaard.Server.csproj" />
+    <Project Path="src/Amballegaard.Simulation/Amballegaard.Simulation.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Amballegaard.Simulation.Tests/Amballegaard.Simulation.Tests.csproj" />
+  </Folder>
+</Solution>
