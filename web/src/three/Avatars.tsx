@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { moveAgent, pickUpAgent, useStore } from '../store'
 import { setControlsEnabled } from './camera'
+import { LowPolyResident, PixelResident, VoxelResident } from './StyledAvatars'
 import type { AgentInfo, Appearance } from '../types'
 
 const mat = (color: string, roughness = 0.8) => new THREE.MeshStandardMaterial({ color, roughness })
@@ -27,6 +28,10 @@ function Avatar({ info }: { info: AgentInfo }) {
   })
   const selected = useStore((s) => s.selectedAgent === info.id)
   const dragging = useStore((s) => s.dragging === info.id)
+  const style = useStore((s) => s.avatarStyle)
+  const speedRef = useRef(0)
+  const flailRef = useRef(false)
+  const headingRef = useRef(0)
   const speech = useStore((s) => s.snapshot?.agents.find((a) => a.id === info.id)?.speech ?? null)
   const set = useStore((s) => s.set)
   const roomName = useStore((s) => {
@@ -70,6 +75,9 @@ function Avatar({ info }: { info: AgentInfo }) {
     g.position.copy(s.pos)
     g.position.y += s.lift
     g.rotation.y = s.heading
+    speedRef.current = isDragged ? 0 : s.speed
+    flailRef.current = isDragged
+    headingRef.current = s.heading
 
     if (isDragged) {
       // Dingler med arme og ben mens den bæres.
@@ -105,12 +113,14 @@ function Avatar({ info }: { info: AgentInfo }) {
     setControlsEnabled(false)
     const startX = e.nativeEvent.clientX, startY = e.nativeEvent.clientY
     let started = false
+    let chatter = 0
     const move = (ev: PointerEvent) => {
       if (!started && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
         started = true
         useStore.getState().set({ dragging: info.id, selectedAgent: info.id, followAgent: false })
         document.body.style.cursor = 'grabbing'
         pickUpAgent(info.id)
+        chatter = window.setInterval(() => pickUpAgent(info.id), 3200)
       }
     }
     const up = () => {
@@ -118,6 +128,7 @@ function Avatar({ info }: { info: AgentInfo }) {
       window.removeEventListener('pointerup', up)
       setControlsEnabled(true)
       document.body.style.cursor = ''
+      window.clearInterval(chatter)
       if (!started) return
       const { x, z } = state.current.ground
       state.current.pin = { x, z, until: performance.now() + 1500 }
@@ -134,9 +145,13 @@ function Avatar({ info }: { info: AgentInfo }) {
       onPointerOver={() => { if (!useStore.getState().dragging) document.body.style.cursor = 'grab' }}
       onPointerOut={() => { if (!useStore.getState().dragging) document.body.style.cursor = '' }}>
       <group ref={body}>
-        {info.kind === 'dog'
-          ? <DogBody a={info.appearance} legs={[legL, legR, armL, armR]} />
-          : <HumanBody a={info.appearance} legL={legL} legR={legR} armL={armL} armR={armR} />}
+        {style === 'voxel'
+          ? <VoxelResident info={info} speedRef={speedRef} flailRef={flailRef} />
+          : style === 'pixel'
+            ? <PixelResident info={info} speedRef={speedRef} headingRef={headingRef} flailRef={flailRef} />
+            : info.kind === 'dog'
+              ? <DogBody a={info.appearance} legs={[legL, legR, armL, armR]} />
+              : <LowPolyResident info={info} speedRef={speedRef} flailRef={flailRef} />}
       </group>
       {/* Kontaktskygge under fødderne for at forankre figuren */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
@@ -163,151 +178,7 @@ function Avatar({ info }: { info: AgentInfo }) {
 
 type LimbRef = React.RefObject<THREE.Group | null>
 
-function HumanBody({ a, legL, legR, armL, armR }: { a: Appearance; legL: LimbRef; legR: LimbRef; armL: LimbRef; armR: LimbRef }) {
-  const m = useMemo(() => ({
-    skin: mat(a.skin, 0.6), top: mat(a.top, 0.9), bottom: mat(a.bottom, 0.9), hair: mat(a.hair, 0.65),
-    shoe: mat('#222326', 0.5), eye: mat('#1b1d22', 0.2), beard: a.beard ? mat(a.beard, 0.9) : null,
-  }), [a])
-  const H = a.height
-  const hipY = H * 0.5
-  const legLen = hipY - 0.05
-  const legR_ = H * 0.052
-  const shoulderY = H * 0.8
-  const shoulderW = H * (H > 1.5 ? 0.125 : 0.115)
-  const armLen = H * 0.36
-  const headR = H * (H > 1.5 ? 0.064 : 0.074)
-  const headY = H - headR * 1.05
 
-  return (
-    <group>
-      {/* Ben */}
-      {[[legL, -1], [legR, 1]].map(([ref, side]) => (
-        <group key={side as number} ref={ref as LimbRef} position={[(side as number) * H * 0.055, hipY, 0]}>
-          <mesh material={m.bottom} position={[0, -legLen / 2, 0]} castShadow>
-            <capsuleGeometry args={[legR_, legLen - legR_ * 2, 6, 12]} />
-          </mesh>
-          <mesh material={m.shoe} position={[0, -legLen - 0.005, 0.04]} castShadow>
-            <boxGeometry args={[legR_ * 1.9, 0.07, H * 0.15]} />
-          </mesh>
-        </group>
-      ))}
-      {/* Bækken + torso */}
-      <mesh material={m.bottom} position={[0, hipY + 0.02, 0]} scale={[1.25, 0.6, 0.85]} castShadow>
-        <sphereGeometry args={[H * 0.1, 20, 14]} />
-      </mesh>
-      <mesh material={m.top} position={[0, (hipY + shoulderY) / 2 + 0.02, 0]} scale={[1, 1, 0.62]} castShadow>
-        <capsuleGeometry args={[H * 0.105, shoulderY - hipY - H * 0.12, 8, 18]} />
-      </mesh>
-      <mesh material={m.top} position={[0, shoulderY - 0.01, 0]} scale={[1.55, 0.55, 0.75]} castShadow>
-        <sphereGeometry args={[H * 0.085, 20, 12]} />
-      </mesh>
-      {/* Arme */}
-      {[[armL, -1], [armR, 1]].map(([ref, side]) => (
-        <group key={side as number} ref={ref as LimbRef} position={[(side as number) * shoulderW, shoulderY - 0.02, 0]} rotation={[0, 0, 0]}>
-          <group rotation={[0, 0, (side as number) * 0.07]}>
-            <mesh material={m.top} position={[0, -armLen * 0.28, 0]} castShadow>
-              <capsuleGeometry args={[H * 0.033, armLen * 0.45, 6, 10]} />
-            </mesh>
-            <mesh material={m.skin} position={[0, -armLen * 0.72, 0]} castShadow>
-              <capsuleGeometry args={[H * 0.027, armLen * 0.38, 6, 10]} />
-            </mesh>
-            <mesh material={m.skin} position={[0, -armLen - 0.01, 0]} castShadow>
-              <sphereGeometry args={[H * 0.03, 12, 10]} />
-            </mesh>
-          </group>
-        </group>
-      ))}
-      {/* Hals + hoved */}
-      <mesh material={m.skin} position={[0, shoulderY + H * 0.035, 0]} castShadow>
-        <cylinderGeometry args={[H * 0.028, H * 0.032, H * 0.07, 12]} />
-      </mesh>
-      <group position={[0, headY, 0]}>
-        <mesh material={m.skin} scale={[0.9, 1.08, 0.98]} castShadow><sphereGeometry args={[headR, 28, 20]} /></mesh>
-        <mesh material={m.skin} position={[0, -headR * 0.05, headR * 0.92]} scale={[0.6, 1, 0.8]}><sphereGeometry args={[headR * 0.16, 10, 8]} /></mesh>
-        {[-1, 1].map((s) => (
-          <group key={s}>
-            <mesh material={m.eye} position={[s * headR * 0.34, headR * 0.12, headR * 0.86]}><sphereGeometry args={[headR * 0.085, 10, 8]} /></mesh>
-            <mesh material={m.skin} position={[s * headR * 0.9, 0, 0]} scale={[0.4, 1, 0.7]}><sphereGeometry args={[headR * 0.22, 10, 8]} /></mesh>
-          </group>
-        ))}
-        {m.beard && (
-          <mesh material={m.beard} scale={[0.92, 1.08, 1.0]}>
-            <sphereGeometry args={[headR * 1.025, 24, 16, Math.PI / 2 - 1.15, 2.3, Math.PI * 0.56, Math.PI * 0.3]} />
-          </mesh>
-        )}
-        <Hair a={a} r={headR} m={m.hair} />
-      </group>
-    </group>
-  )
-}
-
-function Hair({ a, r, m }: { a: Appearance; r: number; m: THREE.Material }) {
-  const cap = (
-    <mesh material={m} position={[0, r * 0.12, -r * 0.05]} scale={[0.95, 1.05, 1.03]} castShadow>
-      <sphereGeometry args={[r * 1.02, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.48]} />
-    </mesh>
-  )
-  switch (a.hairStyle) {
-    case 'shortSpiky': {
-      const spikes = Array.from({ length: 22 }, (_, i) => {
-        const t = i / 22
-        const ang = t * Math.PI * 2 * 3.7
-        const rad = Math.sqrt(t) * 0.75
-        return { x: Math.cos(ang) * rad * r, z: Math.sin(ang) * rad * r * 0.95 + r * 0.05, tilt: rad }
-      })
-      return (
-        <group>
-          {cap}
-          {spikes.map((s, i) => (
-            <mesh key={i} material={m} position={[s.x, r * (0.95 - s.tilt * 0.35), s.z]}
-              rotation={[s.z / r * 0.6, 0, -s.x / r * 0.6]} castShadow>
-              <coneGeometry args={[r * 0.13, r * 0.38, 6]} />
-            </mesh>
-          ))}
-        </group>
-      )
-    }
-    case 'longStraight':
-      return (
-        <group>
-          {cap}
-          <mesh material={m} position={[0, -r * 0.75, -r * 0.42]} scale={[1, 1, 0.5]} castShadow>
-            <capsuleGeometry args={[r * 1.0, r * 1.7, 8, 18]} />
-          </mesh>
-          {[-1, 1].map((s) => (
-            <mesh key={s} material={m} position={[s * r * 0.86, -r * 0.55, r * 0.05]} scale={[0.35, 1, 0.55]} castShadow>
-              <capsuleGeometry args={[r * 0.5, r * 1.5, 6, 10]} />
-            </mesh>
-          ))}
-          <mesh material={m} position={[0, r * 0.55, r * 0.55]} rotation={[0.9, 0, 0]} scale={[1.6, 0.35, 0.6]}>
-            <sphereGeometry args={[r * 0.5, 14, 8]} />
-          </mesh>
-        </group>
-      )
-    case 'ponytail':
-      return (
-        <group>
-          {cap}
-          <mesh material={m} position={[0, r * 0.35, -r * 1.0]} castShadow><sphereGeometry args={[r * 0.28, 12, 10]} /></mesh>
-          <mesh material={m} position={[0, -r * 0.35, -r * 1.12]} rotation={[0.2, 0, 0]} castShadow>
-            <capsuleGeometry args={[r * 0.26, r * 1.2, 6, 10]} />
-          </mesh>
-          {[-1, 1].map((s) => (
-            <mesh key={s} material={m} position={[s * r * 0.82, -r * 0.05, r * 0.15]} scale={[0.3, 1, 0.5]}><sphereGeometry args={[r * 0.45, 10, 8]} /></mesh>
-          ))}
-        </group>
-      )
-    default: // shortMessy
-      return (
-        <group>
-          {cap}
-          {[[0.3, 0.8, 0.5], [-0.35, 0.85, 0.35], [0, 0.95, 0], [0.5, 0.6, -0.3], [-0.5, 0.65, -0.35], [0.1, 0.85, 0.65]].map(([x, y, z], i) => (
-            <mesh key={i} material={m} position={[x * r, y * r, z * r]} castShadow><sphereGeometry args={[r * 0.32, 10, 8]} /></mesh>
-          ))}
-        </group>
-      )
-  }
-}
 
 function DogBody({ a, legs }: { a: Appearance; legs: LimbRef[] }) {
   const fur = useMemo(() => mat(a.hair, 0.95), [a.hair])
@@ -343,3 +214,4 @@ function DogBody({ a, legs }: { a: Appearance; legs: LimbRef[] }) {
     </group>
   )
 }
+

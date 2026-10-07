@@ -20,5 +20,6 @@ export default defineConfig({
     outDir: '../src/Amballegaard.Server/wwwroot',
     emptyOutDir: true,
     chunkSizeWarningLimit: 2500,
+    rollupOptions: { input: { main: 'index.html', showcase: 'showcase.html', family: 'family.html', familyVoxel: 'family-voxel.html' } },
   },
 })

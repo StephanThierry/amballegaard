@@ -12,7 +12,11 @@ public sealed record Appearance(
     string Top,
     string Bottom,
     double Height,
-    string? Beard = null);
+    string? Beard = null,
+    /** Mønster på overdelen, fx "plaid" (rød/sort skovmandsskjorte). */
+    string? Pattern = null,
+    /** Slankere skuldre/talje og lidt bredere hofter. */
+    bool Feminine = false);
 
 public sealed class Agent
 {

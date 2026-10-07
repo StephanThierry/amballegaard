@@ -58,6 +58,8 @@ export interface Appearance {
   bottom: string
   height: number
   beard?: string | null
+  pattern?: string | null
+  feminine?: boolean
 }
 
 export interface AgentInfo {

@@ -17,6 +17,8 @@ interface State {
   hoveredRoom: string | null
   /** Beboer der trækkes med musen lige nu. */
   dragging: string | null
+  /** Figurstil for beboerne (kun denne browser). */
+  avatarStyle: AvatarStyle
   /** Aktivt værktøj: "vector" = træk pile til møbelplacering. */
   tool: 'none' | 'vector'
   vectors: VectorRec[]
@@ -37,11 +39,23 @@ export const useStore = create<State>((set) => ({
   followAgent: false,
   hoveredRoom: null,
   dragging: null,
+  avatarStyle: readStoredStyle() ?? 'voxel',
   tool: 'none',
   vectors: [],
   vectorDraft: null,
   set: (p) => set(p),
 }))
+
+export type AvatarStyle = 'voxel' | 'pixel' | 'classic'
+const STYLE_KEY = 'amballegaard.avatarStyle'
+function readStoredStyle(): AvatarStyle | null {
+  try { const v = localStorage.getItem(STYLE_KEY); return v === 'voxel' || v === 'pixel' || v === 'classic' ? v : null } catch { return null }
+}
+/** Vælg figurstil for denne browser (gemmes lokalt, påvirker ikke andre brugere). */
+export function setAvatarStyle(style: AvatarStyle) {
+  try { localStorage.setItem(STYLE_KEY, style) } catch { /* privat vindue o.l. */ }
+  useStore.getState().set({ avatarStyle: style })
+}
 
 let connection: signalR.HubConnection | null = null
 let connecting: Promise<void> | null = null
@@ -54,6 +68,14 @@ export function connect() {
 async function doConnect() {
   const house = (await (await fetch('/api/house')).json()) as House
   useStore.getState().set({ house })
+  // Serverens standardstil bruges kun hvis brugeren ikke selv har valgt en.
+  if (!readStoredStyle()) {
+    try {
+      const cfg = await (await fetch('/api/config')).json() as { defaultAvatarStyle?: string }
+      const s = cfg.defaultAvatarStyle
+      if (s === 'voxel' || s === 'pixel' || s === 'classic') useStore.getState().set({ avatarStyle: s })
+    } catch { /* ældre server uden /api/config */ }
+  }
 
   connection = new signalR.HubConnectionBuilder()
     .withUrl('/hubs/world')

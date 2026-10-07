@@ -135,7 +135,7 @@ public sealed class World
     public void PickUp(string id)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
-        if (agent is not null) Say(agent, Speech.PickedUp(agent, _rng));
+        if (agent is not null) Say(agent, Speech.PickedUp(agent, _rng), 3.2);
     }
 
     public void Say(Agent agent, string text, double seconds = 4.5)

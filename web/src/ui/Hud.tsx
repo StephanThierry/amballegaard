@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { currentSimSeconds, jumpToTimeOfDay, setAgentActive, setPaused, setTimeScale, useStore } from '../store'
+import { currentSimSeconds, jumpToTimeOfDay, setAgentActive, setAvatarStyle, setPaused, setTimeScale, useStore, type AvatarStyle } from '../store'
 import { SUNRISE_JUMP, SUNSET_JUMP } from '../three/sun'
 import { resetView, rotateView } from '../three/camera'
 import type { VectorRec, WallMode } from '../types'
@@ -48,6 +48,7 @@ export function Hud() {
     <>
       <div className="panel top-left">
         <div className="title">Amballegaard <span className={s.connected ? 'dot on' : 'dot'} title={s.connected ? 'Forbundet' : 'Afbrudt'} /></div>
+        <a className="showcase-link" href="/showcase.html" target="_blank" rel="noreferrer">Avatar-showcase ↗</a>
         <div className="clock">Dag {day} · <b>{time}</b></div>
         <div className="row">
           <button className={paused ? 'active' : ''} onClick={() => setPaused(!paused)} title="Pause">{paused ? '▶' : '❚❚'}</button>
@@ -87,6 +88,11 @@ export function Hud() {
 
       <div className="panel bottom-left">
         <div className="label">Beboere</div>
+        <div className="row style-row" title="Figurstil (gælder kun for dig)">
+          {([['voxel', 'Voxel'], ['pixel', 'Pixelart'], ['classic', 'Low-poly']] as [AvatarStyle, string][]).map(([k, label]) => (
+            <button key={k} className={s.avatarStyle === k ? 'active' : ''} onClick={() => setAvatarStyle(k)}>{label}</button>
+          ))}
+        </div>
         {s.agents.map((a) => {
           const st = s.snapshot?.agents.find((x) => x.id === a.id)
           const on = st?.active !== false

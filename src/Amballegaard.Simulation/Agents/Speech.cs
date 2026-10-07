@@ -78,8 +78,21 @@ public static class Speech
     public static readonly IReadOnlyList<string> DogLines = ["Vuf!", "Vuf vuf!", "*snøfter*", "Legetid?", "*logrer med halen*", "Grrr…"];
 
     /// <summary>Reaktioner når brugeren løfter en beboer op med musen.</summary>
-    public static readonly IReadOnlyList<string> PickedUpLines = ["Hov! Sæt mig ned!", "Wiii!", "Hvor skal vi hen?", "Jeg kan altså godt selv gå!", "Uha, det kilder!"];
-    public static readonly IReadOnlyList<string> DogPickedUpLines = ["Vuf?!", "*piber*", "*logrer forvirret*"];
+    public static readonly IReadOnlyList<string> PickedUpLines =
+    [
+        "Hov! Sæt mig ned!", "Wiii!", "Hvor skal vi hen?!", "Jeg kan altså godt selv gå!", "Uha, det kilder!",
+        "HVAD sker der?!", "Jeg FLYVER!", "Hjæææælp!", "Det her stod ikke i kalenderen!", "Hvem løfter mig?!",
+        "Er det et jordskælv?!", "Jeg har ikke engang sko på!", "Mine fødder rører ikke jorden!", "Woooah!",
+        "Det her er SÅ mærkeligt!", "Åh nej, jeg får højdeskræk!", "Ej, hvad laver du?!", "Stop, jeg bliver svimmel!",
+        "Er jeg i en computer?!", "Nogen må forklare det her!", "Det havde jeg ikke set komme!", "Ahhh! Pas på lampen!",
+        "Jeg svæver! Jeg SVÆVER!", "Er det her normalt?!", "Hold da op!", "Det her skal jeg fortælle nogen om!",
+        "Kan vi ikke bare tage trapperne?", "Jeg er ikke en dukke!", "Okay… det her er faktisk lidt sjovt!",
+    ];
+    public static readonly IReadOnlyList<string> ChildPickedUpLines =
+    [
+        "Igen! Igen!", "Det er ligesom i Roblox!", "Jeg kan flyve som en superhelt!", "Mor! Far! Se mig!", "Wiiiii, højere!",
+    ];
+    public static readonly IReadOnlyList<string> DogPickedUpLines = ["Vuf?!", "*piber*", "*logrer forvirret*", "VUF VUF!", "*spræller med potterne*", "Auuuu!"];
 
     public static readonly IReadOnlyList<string> FridgeLines =
     [
@@ -107,7 +120,12 @@ public static class Speech
 
     public static string PickedUp(Agent a, Random rng)
     {
-        var pool = a.Kind == AgentKind.Dog ? DogPickedUpLines : PickedUpLines;
-        return pool[rng.Next(pool.Count)];
+        var pool = a.Kind == AgentKind.Dog ? DogPickedUpLines
+            : a.Kind == AgentKind.Child ? PickedUpLines.Concat(ChildPickedUpLines).ToList()
+            : PickedUpLines;
+        // Sig ikke det samme to gange i træk.
+        string line;
+        do line = pool[rng.Next(pool.Count)]; while (pool.Count > 1 && line == a.Speech);
+        return line;
     }
 }

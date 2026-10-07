@@ -1596,7 +1596,7 @@ function KitchenTall({ w = 2.2, fridgeId = 'koeleskab', freezerId = 'fryser' }: 
   return (
     <group>
       <Fridge id={fridgeId} x={col(0)} cw={cw} H={H} D={D} />
-      {[1, 2].map((i) => <OvenColumn key={i} x={col(i)} cw={cw} H={H} D={D} />)}
+      {[1, 2].map((i) => <OvenColumn key={i} id={`ovn-${i}`} x={col(i)} cw={cw} H={H} D={D} />)}
       <Freezer id={freezerId} x={col(3)} cw={cw} H={H} D={D} />
       {/* Sokkel */}
       <Box p={[0, 0.05, -0.04]} s={[w, 0.1, D - 0.06]} m={f.darkTop} shadow={false} />
@@ -1675,15 +1675,26 @@ function Fridge({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: num
 }
 
 /** Søjle med overskab, Siemens-indbygningsovn i midten og tre skuffer i bunden. */
-function OvenColumn({ x, cw, H, D }: { x: number; cw: number; H: number; D: number }) {
+function OvenColumn({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: number; D: number }) {
   const f = fm()
   const k = kitchenMats()
+  const door = useRef<THREE.Group>(null)
+  const step = useApplianceOpen(id)
+  // Ovnlågen er hængslet i bunden og vipper ud/ned fra toppen (~85°).
+  useFrame((_, dt) => { if (door.current) door.current.rotation.x = step(dt) * 1.48 })
+  const cavity = useMemo(() => ({
+    dark: new THREE.MeshStandardMaterial({ color: '#1b1c1f', roughness: 0.5, metalness: 0.4 }),
+    enamel: new THREE.MeshStandardMaterial({ color: '#2a2c30', roughness: 0.35, metalness: 0.2, emissive: '#ff9a40', emissiveIntensity: 0.08 }),
+    rack: new THREE.MeshStandardMaterial({ color: '#b9bcbf', roughness: 0.3, metalness: 1 }),
+  }), [])
   const fz = D / 2 - 0.011
   const gap = 0.004
   const drawerH = (0.86 - 0.1) / 3
   return (
     <group position={[x, 0, 0]}>
-      <Box p={[0, H / 2, -0.022]} s={[cw, H, D - 0.022]} m={f.white} />
+      {/* Korpus under og over ovnen (ovnrummet er hult, så lågen kan åbnes) */}
+      <Box p={[0, 0.43, -0.022]} s={[cw, 0.86, D - 0.022]} m={f.white} />
+      <Box p={[0, (1.46 + H) / 2, -0.022]} s={[cw, H - 1.46, D - 0.022]} m={f.white} />
       {/* Tre skuffer */}
       {[0, 1, 2].map((i) => (
         <group key={i}>
@@ -1691,13 +1702,28 @@ function OvenColumn({ x, cw, H, D }: { x: number; cw: number; H: number; D: numb
           <Box p={[0, 0.1 + drawerH * (i + 1) - 0.035, fz + 0.016]} s={[0.3, 0.014, 0.014]} m={f.steel} />
         </group>
       ))}
-      {/* Ovn (sort glasfront, stålgreb, display) */}
-      <group position={[0, 0.86 + 0.3, fz]}>
-        <Box p={[0, 0, -0.002]} s={[cw - 2 * gap, 0.6 - 2 * gap, 0.026]} m={k.ovenGlass} />
-        <Box p={[0, 0.2, 0.024]} s={[cw - 0.1, 0.018, 0.018]} m={f.steel} />
-        <Box p={[0, 0.255, 0.0115]} s={[0.12, 0.028, 0.002]} m={k.display} shadow={false} />
-        {[-1, 1].map((s) => <mesh key={s} material={f.steel} position={[s * 0.17, 0.255, 0.016]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.018, 0.018, 0.012, 16]} /></mesh>)}
-        <mesh material={k.ovenGlass} position={[0, -0.06, 0.012]}><boxGeometry args={[cw - 0.12, 0.3, 0.002]} /></mesh>
+      {/* Ovnrum: mørk emalje, to riste */}
+      <group position={[0, 0.86, 0]}>
+        <Box p={[0, 0.25, -D / 2 + 0.03]} s={[cw - 0.02, 0.5, 0.02]} m={cavity.enamel} />
+        {[-1, 1].map((sx) => <Box key={sx} p={[sx * (cw / 2 - 0.02), 0.25, 0]} s={[0.02, 0.5, D - 0.04]} m={cavity.dark} />)}
+        <Box p={[0, 0.01, 0]} s={[cw - 0.02, 0.02, D - 0.04]} m={cavity.dark} />
+        <Box p={[0, 0.49, 0]} s={[cw - 0.02, 0.02, D - 0.04]} m={cavity.dark} />
+        {[0.16, 0.32].map((y) => <Box key={y} p={[0, y, -0.01]} s={[cw - 0.06, 0.006, D - 0.1]} m={cavity.rack} shadow={false} />)}
+      </group>
+      {/* Betjeningspanel (fast) med display og drejeknapper */}
+      <group position={[0, 0.86 + 0.55, fz]}>
+        <Box p={[0, 0, -0.002]} s={[cw - 2 * gap, 0.1 - 2 * gap, 0.026]} m={k.ovenGlass} />
+        <Box p={[0, 0, 0.0115]} s={[0.12, 0.028, 0.002]} m={k.display} shadow={false} />
+        {[-1, 1].map((sx) => <mesh key={sx} material={f.steel} position={[sx * 0.17, 0, 0.016]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.018, 0.018, 0.012, 16]} /></mesh>)}
+      </group>
+      {/* Låge: hængslet i bunden, klik åbner/lukker */}
+      <group ref={door} position={[0, 0.86 + gap, fz]} userData={{ dynamic: true }}>
+        <group {...applianceClick(id)}>
+          <Box p={[0, 0.25 - gap, -0.002]} s={[cw - 2 * gap, 0.5 - 2 * gap, 0.026]} m={k.ovenGlass} />
+          <mesh material={k.ovenGlass} position={[0, 0.22, 0.012]}><boxGeometry args={[cw - 0.12, 0.3, 0.002]} /></mesh>
+          <Box p={[0, 0.44, 0.024]} s={[cw - 0.1, 0.018, 0.018]} m={f.steel} />
+          {[-1, 1].map((sx) => <Box key={sx} p={[sx * (cw / 2 - 0.08), 0.44, 0.012]} s={[0.014, 0.014, 0.03]} m={f.steel} />)}
+        </group>
       </group>
       {/* Overskab */}
       <RoundedBox args={[cw - 2 * gap, H - 1.46 - 2 * gap, 0.022]} radius={0.004} smoothness={2} position={[0, 1.46 + (H - 1.46) / 2, fz]} material={f.white} castShadow />
@@ -1706,33 +1732,54 @@ function OvenColumn({ x, cw, H, D }: { x: number; cw: number; H: number; D: numb
   )
 }
 
-/** Fryser med fire fryseskuffer der glider ud når fryseren åbnes. */
+/**
+ * Fryser med én hel låge (hængslet i højre side, så den åbner væk fra køleskabet). Indenfor sidder 4 blålige
+ * fryseskuffer, der hver trækkes ud med sit eget klik — men kun når lågen er åben.
+ */
 function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: number; D: number }) {
   const f = fm()
   const k = kitchenMats()
+  const door = useRef<THREE.Group>(null)
   const drawers = useRef<(THREE.Group | null)[]>([])
-  const step = useApplianceOpen(id)
+  const doorStep = useApplianceOpen(id)
+  const doorOpen = useStore((st) => st.snapshot?.openDoors.includes(id) ?? false)
+  const drawerIds = [1, 2, 3, 4].map((i) => `${id}-skuffe-${i}`)
+  const open = useStore((st) => drawerIds.map((d) => st.snapshot?.openDoors.includes(d) ?? false).join(','))
+  const pos = useRef([0, 0, 0, 0])
+  const blue = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#a9cbe0', roughness: 0.25, transparent: true, opacity: 0.7, depthWrite: false }), [])
+  const blueFront = useMemo(() => new THREE.MeshStandardMaterial({ color: '#8fb9d4', roughness: 0.3 }), [])
   useFrame((_, dt) => {
-    const o = step(dt)
-    drawers.current.forEach((g, i) => { if (g) g.position.z = o * (0.36 - i * 0.04) })
+    const d = doorStep(dt)
+    if (door.current) door.current.rotation.y = d * 1.75
+    const states = open.split(',')
+    drawers.current.forEach((g, i) => {
+      // Skuffen kan kun stå ude, når lågen er (næsten) helt åben.
+      const target = states[i] === 'true' && d > 0.85 ? 0.32 : 0
+      pos.current[i] += THREE.MathUtils.clamp(target - pos.current[i], -dt * 0.8, dt * 0.8)
+      if (g) g.position.z = pos.current[i]
+    })
   })
-  const n = 4, top = H - 0.02, bottom = 0.12
+  const n = 4, top = H - 0.25, bottom = 0.14
   const dh = (top - bottom) / n
+  const inW = cw - 0.05, inD = D - 0.1
   return (
     <group position={[x, 0, 0]}>
       <Carcass cw={cw} H={H} D={D} />
       <mesh material={k.frost} position={[0, H / 2, -D / 2 + 0.01]}><planeGeometry args={[cw - 0.04, H - 0.2]} /></mesh>
+      {/* Øverste hylde over skufferne */}
+      <mesh material={k.shelf} position={[0, top + 0.01, -0.02]}><boxGeometry args={[inW, 0.006, inD]} /></mesh>
+      <Box p={[-0.08, top + 0.07, -0.05]} s={[0.16, 0.11, 0.2]} m={k.food[5]} />
       {Array.from({ length: n }, (_, i) => {
         const yc = bottom + dh * (i + 0.5)
         return (
           <group key={i} ref={(g) => { drawers.current[i] = g }} userData={{ dynamic: true }}>
-            <group {...applianceClick(id)}>
-              {/* Front */}
-              <RoundedBox args={[cw - 0.008, dh - 0.008, 0.022]} radius={0.004} smoothness={2} position={[0, yc, D / 2 - 0.011]} material={f.white} castShadow />
-              <Box p={[0, yc + dh / 2 - 0.06, D / 2 + 0.006]} s={[0.3, 0.016, 0.016]} m={f.steel} />
-              {/* Skuffekasse med frostvarer */}
-              <Box p={[0, yc - dh / 2 + 0.02, 0]} s={[cw - 0.06, 0.012, D - 0.08]} m={k.frost} shadow={false} />
-              {[-1, 1].map((s) => <Box key={s} p={[s * (cw / 2 - 0.035), yc - dh / 2 + 0.12, 0]} s={[0.008, 0.22, D - 0.08]} m={k.shelf} shadow={false} />)}
+            <group {...(doorOpen ? applianceClick(drawerIds[i]) : {})}>
+              {/* Skuffekasse i blåligt plast med greb-kant foran */}
+              <Box p={[0, yc - dh / 2 + 0.012, -0.01]} s={[inW - 0.01, 0.012, inD]} m={blue} shadow={false} />
+              {[-1, 1].map((s) => <Box key={s} p={[s * (inW / 2 - 0.01), yc - 0.02, -0.01]} s={[0.008, dh - 0.06, inD]} m={blue} shadow={false} />)}
+              <Box p={[0, yc - 0.02, inD / 2 - 0.01]} s={[inW - 0.01, dh - 0.06, 0.012]} m={blueFront} />
+              <Box p={[0, yc + dh / 2 - 0.08, inD / 2 + 0.002]} s={[0.18, 0.02, 0.012]} m={blueFront} />
+              {/* Frostvarer */}
               <Box p={[-0.1, yc - dh / 2 + 0.07, -0.05]} s={[0.14, 0.09, 0.18]} m={k.food[(i * 3 + 2) % 9]} />
               <Box p={[0.08, yc - dh / 2 + 0.06, 0.06]} s={[0.16, 0.07, 0.12]} m={k.food[(i * 3 + 5) % 9]} />
               <mesh material={k.food[(i * 3 + 7) % 9]} position={[0.1, yc - dh / 2 + 0.08, -0.1]}><cylinderGeometry args={[0.05, 0.05, 0.11, 14]} /></mesh>
@@ -1740,6 +1787,13 @@ function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: nu
           </group>
         )
       })}
+      {/* Lågen: hængslet i højre side */}
+      <group ref={door} position={[cw / 2 - 0.003, 0, D / 2 - 0.011]} userData={{ dynamic: true }}>
+        <group position={[-cw / 2 + 0.003, 0, 0]} {...applianceClick(id)}>
+          <RoundedBox args={[cw - 0.006, H - 0.106, 0.022]} radius={0.005} smoothness={2} position={[0, (H + 0.1) / 2, 0]} material={f.white} castShadow />
+          <Box p={[-cw / 2 + 0.05, 1.05, 0.02]} s={[0.018, 0.5, 0.018]} m={f.steel} />
+        </group>
+      </group>
     </group>
   )
 }
@@ -1894,9 +1948,9 @@ function BenchPress() {
     frame: new THREE.MeshStandardMaterial({ color: '#1b1c1e', roughness: 0.45, metalness: 0.6 }),
     pad: new THREE.MeshStandardMaterial({ color: '#1e1e20', roughness: 0.6 }),
     bar: new THREE.MeshStandardMaterial({ color: '#c8cbce', roughness: 0.25, metalness: 1 }),
-    p20: new THREE.MeshStandardMaterial({ color: '#2a5bd7', roughness: 0.5 }),
-    p5: new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 0.5 }),
-    p25: new THREE.MeshStandardMaterial({ color: '#d93a3a', roughness: 0.5 }),
+    p20: new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.55 }),
+    p5: new THREE.MeshStandardMaterial({ color: '#1c1c1c', roughness: 0.55 }),
+    p25: new THREE.MeshStandardMaterial({ color: '#232323', roughness: 0.55 }),
     p05: new THREE.MeshStandardMaterial({ color: '#8c8f93', roughness: 0.4, metalness: 0.6 }),
   }), [])
   const rackZ = -0.5, barY = 1.05
@@ -2029,6 +2083,8 @@ export interface FurnitureItem {
   /** Benhøjde i meter (0 = ingen ben). */
   legs?: number
   contents?: string
+  /** Ensartet skalering af hele møblet (1 = normal). */
+  scale?: number
   /** Model: navne (endelser) på dele der skjules. */
   hide?: string[]
   /** Håndvask: stort spejl med lysrør. */
@@ -2126,7 +2182,7 @@ export function Furniture() {
   return (
     <group>
       {furnitureItems.map((it) => (
-        <group key={it.id} position={[it.pos[0], it.y ?? 0, it.pos[1]]} rotation={[0, ((it.rot ?? 0) * Math.PI) / 180, 0]}
+        <group key={it.id} position={[it.pos[0], it.y ?? 0, it.pos[1]]} rotation={[0, ((it.rot ?? 0) * Math.PI) / 180, 0]} scale={it.scale ?? 1}
           userData={{ furnitureId: it.id }}>
           <Suspense fallback={null}>{renderItem(it)}</Suspense>
         </group>

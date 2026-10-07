@@ -96,7 +96,13 @@
   "_appliancesDoc": "Hvidevarer beboerne kan gå hen til og åbne. standAt = hvor man står (foran skabet i data/furniture.json 'hoejskabe').",
   "appliances": [
     { "id": "koeleskab", "kind": "fridge", "standAt": [12.68, 4.5] },
+    { "id": "ovn-1", "kind": "oven", "standAt": [13.23, 4.5] },
+    { "id": "ovn-2", "kind": "oven", "standAt": [13.78, 4.5] },
     { "id": "fryser", "kind": "freezer", "standAt": [14.33, 4.5] },
+    { "id": "fryser-skuffe-1", "kind": "freezerDrawer", "standAt": [14.33, 4.5] },
+    { "id": "fryser-skuffe-2", "kind": "freezerDrawer", "standAt": [14.33, 4.5] },
+    { "id": "fryser-skuffe-3", "kind": "freezerDrawer", "standAt": [14.33, 4.5] },
+    { "id": "fryser-skuffe-4", "kind": "freezerDrawer", "standAt": [14.33, 4.5] },
     { "id": "lampe-nord", "kind": "lamp", "standAt": [22.6, 16.0] },
     { "id": "lampe-syd", "kind": "lamp", "standAt": [22.6, 18.8] }
   ],

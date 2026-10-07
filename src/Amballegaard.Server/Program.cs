@@ -22,6 +22,8 @@ app.UseStaticFiles();
 // Rå house.json sendes uændret, så klienten også får tag, have m.m. som simulationen ikke bruger.
 app.MapGet("/api/house", () => Results.File(housePath, "application/json"));
 app.MapGet("/api/agents", (World world) => world.Agents.Select(a => a.ToInfo()));
+// Standard-figurstil for nye besøgende (hver bruger kan vælge en anden i sin egen browser).
+app.MapGet("/api/config", (IConfiguration cfg) => new { defaultAvatarStyle = cfg["DefaultAvatarStyle"] ?? "voxel" });
 app.MapGet("/api/state", (World world) => world.Snapshot());
 
 app.MapHub<WorldHub>("/hubs/world");
