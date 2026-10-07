@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { currentSimSeconds, jumpToTimeOfDay, setPaused, setTimeScale, useStore } from '../store'
+import { currentSimSeconds, jumpToTimeOfDay, setAgentActive, setPaused, setTimeScale, useStore } from '../store'
 import { SUNRISE_JUMP, SUNSET_JUMP } from '../three/sun'
 import { resetView, rotateView } from '../three/camera'
 import type { VectorRec, WallMode } from '../types'
@@ -89,14 +89,21 @@ export function Hud() {
         <div className="label">Beboere</div>
         {s.agents.map((a) => {
           const st = s.snapshot?.agents.find((x) => x.id === a.id)
-          const room = s.house?.rooms.find((r) => r.id === st?.roomId)?.name ?? '—'
+          const on = st?.active !== false
+          const room = on ? s.house?.rooms.find((r) => r.id === st?.roomId)?.name ?? 'Udenfor' : 'Slået fra'
           return (
-            <button key={a.id} className={`resident ${s.selectedAgent === a.id ? 'active' : ''}`}
-              onClick={() => s.set({ selectedAgent: a.id, followAgent: true })}>
-              <span className="swatch" style={{ background: a.kind === 'dog' ? a.appearance.hair : a.appearance.top }} />
-              <span className="name">{a.name}</span>
-              <span className="room">{room}</span>
-            </button>
+            <div key={a.id} className="resident-row">
+              <button className={`resident ${s.selectedAgent === a.id ? 'active' : ''} ${on ? '' : 'off'}`} disabled={!on}
+                onClick={() => s.set({ selectedAgent: a.id, followAgent: true })}>
+                <span className="swatch" style={{ background: a.kind === 'dog' ? a.appearance.hair : a.appearance.top }} />
+                <span className="name">{a.name}</span>
+                <span className="room">{room}</span>
+              </button>
+              <button className={`switch ${on ? 'on' : ''}`} role="switch" aria-checked={on} title={on ? 'Slå fra' : 'Slå til'}
+                onClick={() => { setAgentActive(a.id, !on); if (on && s.selectedAgent === a.id) s.set({ selectedAgent: null, followAgent: false }) }}>
+                <span className="knob" />
+              </button>
+            </div>
           )
         })}
       </div>

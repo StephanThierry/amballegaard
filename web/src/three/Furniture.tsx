@@ -1759,21 +1759,29 @@ function Nightstand({ lampId }: { lampId?: string }) {
   )
 }
 
-/** Tärnaby: kegleformet fod, slank hals og hvælvet skærm i antracit. Klik tænder/slukker (delt via serveren). */
+/**
+ * IKEA Tärnaby (stormlampe-stil): bred antracit fod med messingknap, klar glaskuppel og ravfarvet glødepære.
+ * Klik skifter 0 % → 50 % → 100 % (delt via serveren).
+ */
 function TarnabyLamp({ id, position }: { id: string; position: V3 }) {
-  const on = useStore((s) => s.snapshot?.openDoors.includes(id) ?? false)
+  const level = useStore((s) => s.snapshot?.lamps?.[id] ?? 0) / 100
   const m = useMemo(() => ({
-    body: new THREE.MeshStandardMaterial({ color: '#3a3b3d', roughness: 0.55, metalness: 0.15 }),
-    glow: new THREE.MeshStandardMaterial({ color: '#fff3d6', emissive: '#ffd08a', emissiveIntensity: 0, toneMapped: false, side: THREE.DoubleSide }),
+    base: new THREE.MeshStandardMaterial({ color: '#2c2d2f', roughness: 0.6, metalness: 0.2 }),
+    brass: new THREE.MeshStandardMaterial({ color: '#c9a24a', roughness: 0.3, metalness: 1 }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#f2f4f5', roughness: 0.02, transparent: true, opacity: 0.22, depthWrite: false, clearcoat: 1, side: THREE.DoubleSide }),
+    bulb: new THREE.MeshStandardMaterial({ color: '#c8873a', emissive: '#ffb050', emissiveIntensity: 0, roughness: 0.2, transparent: true, opacity: 0.85, toneMapped: false }),
   }), [])
-  m.glow.emissiveIntensity = on ? 3 : 0
+  m.bulb.emissiveIntensity = level * 3.5
+  const base = useMemo(() => new THREE.LatheGeometry([[0, 0], [0.072, 0], [0.074, 0.012], [0.07, 0.03], [0.05, 0.06], [0.045, 0.072], [0.042, 0.075], [0, 0.075]].map(([x, y]) => new THREE.Vector2(x, y)), 32), [])
+  const dome = useMemo(() => new THREE.LatheGeometry([[0.036, 0], [0.05, 0.015], [0.052, 0.09], [0.046, 0.13], [0.03, 0.15], [0.03, 0.165]].map(([x, y]) => new THREE.Vector2(x, y)), 32), [])
   return (
     <group position={position} {...applianceClick(id)}>
-      <mesh material={m.body} position={[0, 0.03, 0]} castShadow><cylinderGeometry args={[0.035, 0.07, 0.06, 28]} /></mesh>
-      <mesh material={m.body} position={[0, 0.14, 0]} castShadow><cylinderGeometry args={[0.012, 0.018, 0.17, 14]} /></mesh>
-      <mesh material={m.body} position={[0, 0.235, 0]} castShadow><sphereGeometry args={[0.1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
-      <mesh material={m.glow} position={[0, 0.234, 0]} rotation={[Math.PI / 2, 0, 0]}><circleGeometry args={[0.098, 28]} /></mesh>
-      <pointLight position={[0, 0.18, 0]} color="#ffcf8a" intensity={on ? 2.2 : 0} distance={3} decay={1.8} />
+      <mesh geometry={base} material={m.base} castShadow />
+      <mesh material={m.brass} position={[0.05, 0.045, 0.02]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.009, 0.009, 0.012, 14]} /></mesh>
+      <mesh material={m.brass} position={[0, 0.08, 0]}><cylinderGeometry args={[0.034, 0.038, 0.01, 24]} /></mesh>
+      <mesh material={m.bulb} position={[0, 0.115, 0]} scale={[1, 1.6, 1]}><sphereGeometry args={[0.016, 16, 12]} /></mesh>
+      <mesh geometry={dome} material={m.glass} position={[0, 0.08, 0]} />
+      <pointLight position={[0, 0.12, 0]} color="#ffb860" intensity={level * 1.6} distance={3} decay={1.8} />
     </group>
   )
 }

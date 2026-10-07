@@ -27,6 +27,9 @@ public sealed class Agent
     public string RoomId { get; set; } = "";
     public string Activity { get; set; } = "idle";
 
+    /// <summary>Slået til i simulationen (vises og bevæger sig). Kan slås fra i UI'et.</summary>
+    public bool Active { get; set; } = true;
+
     /// <summary>Gå-hastighed i m/s.</summary>
     public double Speed => Kind switch { AgentKind.Dog => 1.4, AgentKind.Child => 1.1, _ => 1.0 };
 

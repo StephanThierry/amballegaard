@@ -115,3 +115,13 @@ button.active { background: var(--accent); color: #fff; border-color: var(--acce
 .app.tool-vector canvas { cursor: crosshair; }
 
 .icon-btn { display: inline-flex; align-items: center; gap: 6px; }
+
+.resident-row { display: flex; gap: 6px; align-items: center; }
+.resident-row .resident { flex: 1; }
+.resident.off { opacity: 0.5; cursor: default; }
+.switch { width: 36px; height: 20px; padding: 0; border-radius: 999px; background: #cfd3d8; position: relative; border: none; flex: none; }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: left 0.15s; }
+.switch.on { background: var(--accent); }
+.switch.on .knob { left: 18px; }
+.switch:hover { filter: brightness(0.95); background: #c2c7cd; }
+.switch.on:hover { background: var(--accent); }

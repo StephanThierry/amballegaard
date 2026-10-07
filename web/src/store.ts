@@ -75,6 +75,7 @@ export const setTimeScale = (scale: number) => connection?.invoke('SetTimeScale'
 export const setPaused = (paused: boolean) => connection?.invoke('SetPaused', paused)
 export const moveAgent = (id: string, x: number, z: number) => connection?.invoke<boolean>('MoveAgent', id, x, z)
 export const pickUpAgent = (id: string) => connection?.invoke('PickUpAgent', id)
+export const setAgentActive = (id: string, active: boolean) => connection?.invoke('SetAgentActive', id, active)
 export const toggleDoor = (id: string) => connection?.invoke('ToggleDoor', id)
 export const toggleMower = () => connection?.invoke('ToggleMower')
 export const jumpToTimeOfDay = (hours: number) => connection?.invoke('JumpToTimeOfDay', hours)

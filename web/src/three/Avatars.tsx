@@ -10,7 +10,8 @@ const mat = (color: string, roughness = 0.8) => new THREE.MeshStandardMaterial({
 
 export function Avatars() {
   const agents = useStore((s) => s.agents)
-  return <>{agents.map((a) => <Avatar key={a.id} info={a} />)}</>
+  const active = useStore((s) => s.snapshot?.agents.filter((a) => a.active !== false).map((a) => a.id).join(',') ?? '')
+  return <>{agents.filter((a) => active.split(',').includes(a.id)).map((a) => <Avatar key={a.id} info={a} />)}</>
 }
 
 function Avatar({ info }: { info: AgentInfo }) {

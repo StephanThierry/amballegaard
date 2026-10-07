@@ -29,6 +29,11 @@ public sealed class WorldHub(World world, SimulationGate gate) : Hub
         lock (gate) return world.MoveAgent(id, new Vec2(x, z));
     }
 
+    public bool SetAgentActive(string id, bool active)
+    {
+        lock (gate) return world.SetActive(id, active);
+    }
+
     public void PickUpAgent(string id)
     {
         lock (gate) world.PickUp(id);

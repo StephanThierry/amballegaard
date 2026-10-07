@@ -126,6 +126,7 @@ public class HouseModelTests
     {
         var house = Load();
         var world = new World(house, Family.Create(), seed: 5);
+        world.SetActive("hund", true);
         Assert.True(world.MoveAgent("hund", new Vec2(4, 20)));
         var exterior = house.Exterior.Select(p => new Vec2(p[0], p[1])).ToArray();
         for (var i = 0; i < 2000; i++)
@@ -156,7 +157,7 @@ public class HouseModelTests
             world.Tick(0.1);
             foreach (var a in world.Agents.Where(a => a.Speech is not null)) heard.Add((a.Id, a.Speech!));
         }
-        Assert.Contains(heard, h => h.Item1 == "hund");
+        Assert.DoesNotContain(heard, h => h.Item1 == "hund"); // hunden er slået fra som standard
         Assert.DoesNotContain(heard, h => h.Item1 == "stephan" && h.Item2 == "Må jeg få noget slik?");
         Assert.DoesNotContain(heard, h => h.Item1 == "lisa" && h.Item2.Contains("bug"));
     }
@@ -277,6 +278,31 @@ public class HouseModelTests
         Assert.Contains(world.Agents, a => a.Speech is not null &&
             (Speech.FridgeLines.Contains(a.Speech) || Speech.FreezerLines.Contains(a.Speech)));
         Assert.True(world.ToggleDoor("koeleskab"));
+    }
+
+    [Fact]
+    public void Inactive_resident_does_not_move_and_can_be_switched_on()
+    {
+        var world = new World(Load(), Family.Create());
+        var dog = world.Agents.Single(a => a.Id == "hund");
+        Assert.False(dog.Active);
+        var p = dog.Position;
+        for (var i = 0; i < 600; i++) world.Tick(0.1);
+        Assert.Equal(p, dog.Position);
+        world.SetActive("hund", true);
+        for (var i = 0; i < 600; i++) world.Tick(0.1);
+        Assert.NotEqual(p, dog.Position);
+    }
+
+    [Fact]
+    public void Bedside_lamp_cycles_off_half_full()
+    {
+        var world = new World(Load(), Family.Create());
+        Assert.Equal(0, world.LampLevels.GetValueOrDefault("lampe-nord"));
+        world.ToggleDoor("lampe-nord"); Assert.Equal(50, world.LampLevels["lampe-nord"]);
+        world.ToggleDoor("lampe-nord"); Assert.Equal(100, world.LampLevels["lampe-nord"]);
+        world.ToggleDoor("lampe-nord"); Assert.Equal(0, world.LampLevels["lampe-nord"]);
+        Assert.DoesNotContain("lampe-nord", world.OpenDoors);
     }
 
     private static double DistanceToSegment(Vec2 p, Vec2 a, Vec2 b)

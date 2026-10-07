@@ -76,6 +76,7 @@ export interface AgentState {
   roomId: string
   activity: string
   speech?: string | null
+  active?: boolean
 }
 
 export interface WorldSnapshot {
@@ -85,6 +86,7 @@ export interface WorldSnapshot {
   agents: AgentState[]
   openDoors: string[]
   mower?: { x: number; z: number; heading: number; state: string; on: boolean }
+  lamps?: Record<string, number>
 }
 
 export type WallMode = 'full' | 'cutaway' | 'low'

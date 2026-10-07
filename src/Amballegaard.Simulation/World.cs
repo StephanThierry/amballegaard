@@ -17,16 +17,20 @@ public sealed class World
     private readonly Random _rng;
     private readonly List<Agent> _agents;
     private readonly HashSet<string> _openDoors = [];
+    private readonly Dictionary<string, int> _lampLevels = [];
     private readonly IReadOnlyList<Vec2> _exterior;
     private readonly List<(Vec2 A, Vec2 B)> _walls;
 
     public HouseModel House { get; }
     public IReadOnlyList<Agent> Agents => _agents;
     public NavGrid Nav { get; }
+
+    /// <summary>Lysstyrke i procent (0/50/100) for dæmpbare lamper.</summary>
+    public IReadOnlyDictionary<string, int> LampLevels => _lampLevels;
     public Mower Mower { get; }
 
     /// <summary>Åbne døre/porte og tændte pejse: dem brugeren har slået til, plus døre en beboer er ved at gå igennem.</summary>
-    public IReadOnlyCollection<string> OpenDoors => _openDoors.Union(_agents.SelectMany(a => a.HeldDoors)).ToHashSet();
+    public IReadOnlyCollection<string> OpenDoors => _openDoors.Union(_agents.Where(a => a.Active).SelectMany(a => a.HeldDoors)).ToHashSet();
 
     /// <summary>Simuleret tid siden midnat dag 1.</summary>
     public TimeSpan SimTime { get; private set; }
@@ -68,7 +72,7 @@ public sealed class World
     public void Tick(double realDt)
     {
         // Talebobler kører i reel tid, så de kan læses uanset tidsfaktor.
-        foreach (var agent in _agents)
+        foreach (var agent in _agents.Where(a => a.Active))
             StepSpeech(agent, realDt);
 
         Mower.Tick(realDt);
@@ -76,7 +80,7 @@ public sealed class World
         if (Paused) return;
         SimTime += TimeSpan.FromSeconds(realDt * TimeScale);
 
-        foreach (var agent in _agents)
+        foreach (var agent in _agents.Where(a => a.Active))
             StepWander(agent, realDt);
     }
 
@@ -117,6 +121,16 @@ public sealed class World
         return true;
     }
 
+    /// <summary>Slå en beboer til/fra. Fra = forsvinder og står stille; til = fortsætter hvor den var.</summary>
+    public bool SetActive(string id, bool active)
+    {
+        var agent = _agents.FirstOrDefault(a => a.Id == id);
+        if (agent is null) return false;
+        agent.Active = active;
+        if (!active) { ClearPath(agent); agent.Speech = null; }
+        return true;
+    }
+
     /// <summary>Beboeren er blevet samlet op med musen.</summary>
     public void PickUp(string id)
     {
@@ -144,6 +158,12 @@ public sealed class World
     public bool ToggleDoor(string openingId)
     {
         if (House.Openings.All(o => o.Id != openingId) && House.Appliances.All(a => a.Id != openingId)) return false;
+        // Dæmpbare lamper skifter 0 % → 50 % → 100 % → 0 %.
+        if (House.Appliances.FirstOrDefault(a => a.Id == openingId) is { Kind: "lamp" })
+        {
+            _lampLevels[openingId] = (_lampLevels.GetValueOrDefault(openingId) + 50) % 150;
+            return true;
+        }
         if (!_openDoors.Remove(openingId)) _openDoors.Add(openingId);
         return true;
     }

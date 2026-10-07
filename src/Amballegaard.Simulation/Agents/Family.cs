@@ -27,7 +27,7 @@ public static class Family
         },
         new()
         {
-            Id = "hund", Name = "Hund", Kind = AgentKind.Dog, HomeRoomId = "alrum",
+            Id = "hund", Name = "Hund", Kind = AgentKind.Dog, HomeRoomId = "alrum", Active = false,
             Appearance = new("#c9a26b", "#c9a26b", "dog", "#c9a26b", "#c9a26b", 0.55),
         },
     ];
