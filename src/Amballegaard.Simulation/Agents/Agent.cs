@@ -57,4 +57,8 @@ public sealed class Agent
     internal double IdleSeconds { get; set; }
     internal double SpeechRemaining { get; set; }
     internal double NextSpeechIn { get; set; }
+
+    /// <summary>På vej til, eller står i, et "kærligheds-øjeblik" med en anden beboer (se <c>World.StepLove</c>).
+    /// Mens dette er sat, overtager ikke den normale vandre-AI beboerens næste mål.</summary>
+    internal bool InLoveMeeting { get; set; }
 }

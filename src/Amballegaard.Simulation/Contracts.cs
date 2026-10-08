@@ -9,7 +9,7 @@ public sealed record AgentState(string Id, double X, double Z, double Heading, s
 
 public sealed record MowerSnapshot(double X, double Z, double Heading, string State, bool On);
 
-public sealed record WorldSnapshot(double SimSeconds, double TimeScale, bool Paused, IReadOnlyList<AgentState> Agents, IReadOnlyList<string> OpenDoors, MowerSnapshot Mower, IReadOnlyDictionary<string, int> Lamps);
+public sealed record WorldSnapshot(double SimSeconds, double TimeScale, bool Paused, IReadOnlyList<AgentState> Agents, IReadOnlyList<string> OpenDoors, MowerSnapshot Mower, IReadOnlyDictionary<string, int> Lamps, string? LoveEffect);
 
 /// <summary>Et møbels fodaftryk på gulvet (akse-rettet, meter).</summary>
 public sealed record ObstacleRect(string Id, double X0, double Z0, double X1, double Z1);
@@ -27,5 +27,6 @@ public static class WorldContracts
             w.OpenDoors.ToList(),
             new MowerSnapshot(Math.Round(w.Mower.Position.X, 3), Math.Round(w.Mower.Position.Z, 3), Math.Round(w.Mower.Heading, 3),
                 w.Mower.State.ToString().ToLowerInvariant(), w.Mower.On),
-            w.LampLevels.ToDictionary());
+            w.LampLevels.ToDictionary(),
+            w.LoveEffect);
 }

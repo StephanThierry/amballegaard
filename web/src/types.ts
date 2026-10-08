@@ -89,6 +89,8 @@ export interface WorldSnapshot {
   openDoors: string[]
   mower?: { x: number; z: number; heading: number; state: string; on: boolean }
   lamps?: Record<string, number>
+  /** "heart" eller "kiss" mens Stephan og Lisa står i et kærligheds-øjeblik sammen, ellers null/undefined. */
+  loveEffect?: string | null
 }
 
 export type WallMode = 'full' | 'cutaway' | 'low'

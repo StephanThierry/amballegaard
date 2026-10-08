@@ -21,6 +21,15 @@ public sealed class World
     private readonly IReadOnlyList<Vec2> _exterior;
     private readonly List<(Vec2 A, Vec2 B)> _walls;
 
+    /// <summary>Kærligheds-øjeblik mellem Stephan og Lisa, se <see cref="StepLove"/>.</summary>
+    private enum LovePhase { None, Walking, Together }
+    private LovePhase _lovePhase = LovePhase.None;
+    private double _loveCooldown;
+    private double _loveTogetherTimer;
+    private int _loveLineIndex;
+    private LoveScript? _loveScript;
+    private string? _loveEffectKind;
+
     public HouseModel House { get; }
     public IReadOnlyList<Agent> Agents => _agents;
     public NavGrid Nav { get; }
@@ -38,6 +47,10 @@ public sealed class World
     /// <summary>Simulerede sekunder pr. reelt sekund.</summary>
     public double TimeScale { get; set; } = 60;
     public bool Paused { get; set; }
+
+    /// <summary>"heart" eller "kiss" mens Stephan og Lisa står i et kærligheds-øjeblik sammen, ellers null.
+    /// Klienten tegner den midtvejs mellem deres to positioner.</summary>
+    public string? LoveEffect => _lovePhase == LovePhase.Together ? _loveEffectKind : null;
 
     public World(HouseModel house, IEnumerable<Agent> agents, int seed = 1234, TimeSpan? startTime = null)
     {
@@ -66,6 +79,7 @@ public sealed class World
             agent.IdleSeconds = _rng.NextDouble() * 3;
             agent.NextSpeechIn = 3 + _rng.NextDouble() * 20;
         }
+        _loveCooldown = 20 + _rng.NextDouble() * 40;
     }
 
     /// <param name="realDt">Reel tid i sekunder siden sidste tick.</param>
@@ -75,6 +89,7 @@ public sealed class World
         foreach (var agent in _agents.Where(a => a.Active))
             StepSpeech(agent, realDt);
 
+        StepLove(realDt);
         Mower.Tick(realDt);
 
         if (Paused) return;
@@ -104,6 +119,7 @@ public sealed class World
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
+        if (id is "stephan" or "lisa") CancelLoveMeeting();
 
         to = PushAwayFromWalls(ClampToSite(to));
         var room = House.RoomAt(to);
@@ -126,6 +142,7 @@ public sealed class World
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
+        if (!active && id is "stephan" or "lisa") CancelLoveMeeting();
         agent.Active = active;
         if (!active) { ClearPath(agent); agent.Speech = null; }
         return true;
@@ -135,7 +152,23 @@ public sealed class World
     public void PickUp(string id)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
-        if (agent is not null) Say(agent, Speech.PickedUp(agent, _rng), 3.2);
+        if (agent is null) return;
+        if (id is "stephan" or "lisa") CancelLoveMeeting();
+        Say(agent, Speech.PickedUp(agent, _rng), 3.2);
+    }
+
+    /// <summary>Afbryder et igangværende kærligheds-øjeblik rent (bruges hvis Stephan eller Lisa bliver
+    /// trukket, samlet op eller slået fra midt i det), så de ikke sidder fast i <c>InLoveMeeting</c>.</summary>
+    private void CancelLoveMeeting()
+    {
+        if (_lovePhase == LovePhase.None) return;
+        var stephan = _agents.FirstOrDefault(a => a.Id == "stephan");
+        var lisa = _agents.FirstOrDefault(a => a.Id == "lisa");
+        if (stephan is not null) stephan.InLoveMeeting = false;
+        if (lisa is not null) lisa.InLoveMeeting = false;
+        _lovePhase = LovePhase.None;
+        _loveScript = null;
+        _loveEffectKind = null;
     }
 
     public void Say(Agent agent, string text, double seconds = 4.5)
@@ -177,8 +210,9 @@ public sealed class World
             return;
         }
         agent.NextSpeechIn -= dt;
-        // Højst to snakker ad gangen, så det ikke bliver kaos.
-        if (agent.NextSpeechIn <= 0 && _agents.Count(a => a.Speech is not null) < 2)
+        // Højst to snakker ad gangen, så det ikke bliver kaos. Under et kærligheds-øjeblik styrer
+        // StepLove replikkerne alene, så den tilfældige snak blander sig ikke.
+        if (!agent.InLoveMeeting && agent.NextSpeechIn <= 0 && _agents.Count(a => a.Speech is not null) < 2)
             Say(agent, Speech.Random(agent, _rng));
     }
 
@@ -189,6 +223,8 @@ public sealed class World
             agent.IdleSeconds -= dt;
             agent.Activity = "idle";
             if (agent.IdleSeconds > 0) return;
+            // Under et kærligheds-øjeblik: bliv stående, StepLove bestemmer hvornår de slipper igen.
+            if (agent.InLoveMeeting) { agent.IdleSeconds = 0.4; return; }
             if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
             else agent.Target = NextWanderTarget(agent);
             if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
@@ -232,6 +268,94 @@ public sealed class World
         }
         UpdateHeldDoors(agent);
         agent.RoomId = House.RoomAt(agent.Position)?.Id ?? (agent.WanderRoomId is null ? "" : agent.RoomId);
+    }
+
+    /// <summary>
+    /// Stephan og Lisas kærligheds-øjeblikke: når de ind imellem står i samme rum, går de helt tæt sammen
+    /// og udveksler en lille replikudveksling, mens et hjerte (eller et kys, for de replikker der ender sådan)
+    /// stiger op mellem dem. Kører uafhængigt af <see cref="StepWander"/>, som bare får `InLoveMeeting`-flaget
+    /// at vide så den ikke sender dem videre af sig selv, mens det står på.
+    /// </summary>
+    private void StepLove(double dt)
+    {
+        var stephan = _agents.FirstOrDefault(a => a.Id == "stephan");
+        var lisa = _agents.FirstOrDefault(a => a.Id == "lisa");
+        if (stephan is null || lisa is null) return;
+
+        if (_lovePhase == LovePhase.None)
+        {
+            _loveCooldown -= dt;
+            if (_loveCooldown > 0) return;
+            _loveCooldown = 40 + _rng.NextDouble() * 70; // uanset udfald: prøv ikke igen i et stykke tid
+            if (!stephan.Active || !lisa.Active) return;
+            if (stephan.RoomId == "" || stephan.RoomId != lisa.RoomId) return;
+            if (stephan.Speech is not null || lisa.Speech is not null) return;
+            if (stephan.HeldDoors.Count > 0 || lisa.HeldDoors.Count > 0) return; // ikke midt i køleskab/fryser
+            if (_rng.NextDouble() > 0.5) return; // ikke hver gang de er i samme rum
+
+            // Mødes midtvejs mellem dem, forskudt vinkelret på hinanden så de ender side om side.
+            var mid = (stephan.Position + lisa.Position) * 0.5;
+            var dir = lisa.Position - stephan.Position;
+            var perp = dir.Length > 0.01 ? new Vec2(-dir.Z, dir.X).Normalized : new Vec2(1, 0);
+            var stephanGoal = Nav.NearestWalkable(mid + perp * 0.28) ?? mid;
+            var lisaGoal = Nav.NearestWalkable(mid - perp * 0.28) ?? mid;
+            var stephanPath = Nav.FindPath(stephan.Position, stephanGoal);
+            var lisaPath = Nav.FindPath(lisa.Position, lisaGoal);
+            if (stephanPath is not { Count: > 0 } || lisaPath is not { Count: > 0 }) return;
+
+            stephan.InLoveMeeting = true;
+            lisa.InLoveMeeting = true;
+            StartPath(stephan, stephanPath);
+            StartPath(lisa, lisaPath);
+            _loveScript = Speech.RandomLoveScript(_rng);
+            _loveLineIndex = 0;
+            _lovePhase = LovePhase.Walking;
+            return;
+        }
+
+        if (_lovePhase == LovePhase.Walking)
+        {
+            if (stephan.Target is not null || lisa.Target is not null) return; // stadig på vej
+            // Begge fremme: vend ansigtet mod hinanden og start replikudvekslingen.
+            var toLisa = lisa.Position - stephan.Position;
+            stephan.Heading = Math.Atan2(toLisa.X, toLisa.Z);
+            lisa.Heading = Math.Atan2(-toLisa.X, -toLisa.Z);
+            _loveEffectKind = "heart";
+            _loveTogetherTimer = 0;
+            _lovePhase = LovePhase.Together;
+            return;
+        }
+
+        // Together: skridt gennem replikkerne med en lille pause imellem, så en sidste "hale" med
+        // hjertet/kysset synligt uden tale, og slip dem så tilbage til den normale vandre-AI.
+        if (_loveScript is null) { _lovePhase = LovePhase.None; return; }
+        _loveTogetherTimer -= dt;
+        if (_loveTogetherTimer > 0) return;
+
+        if (_loveLineIndex > _loveScript.Lines.Count)
+        {
+            stephan.InLoveMeeting = false;
+            lisa.InLoveMeeting = false;
+            stephan.IdleSeconds = 1 + _rng.NextDouble() * 2;
+            lisa.IdleSeconds = 1 + _rng.NextDouble() * 2;
+            _lovePhase = LovePhase.None;
+            _loveScript = null;
+            _loveEffectKind = null;
+            return;
+        }
+        if (_loveLineIndex == _loveScript.Lines.Count)
+        {
+            _loveTogetherTimer = 1.4; // hale: hjerte/kys ses lidt længere uden ny replik
+            _loveLineIndex++;
+            return;
+        }
+
+        var line = _loveScript.Lines[_loveLineIndex];
+        if (line.Speaker == "both") { Say(stephan, line.Text, 1.8); Say(lisa, line.Text, 1.8); }
+        else Say(line.Speaker == "stephan" ? stephan : lisa, line.Text, 1.8);
+        if (_loveScript.EndsWithKiss && _loveLineIndex == _loveScript.Lines.Count - 1) _loveEffectKind = "kiss";
+        _loveTogetherTimer = 2.0;
+        _loveLineIndex++;
     }
 
     /// <summary>

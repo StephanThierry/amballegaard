@@ -116,6 +116,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 .bubble.reaction { background: #ffe6bf; color: #7a4a10; font-style: italic; letter-spacing: 0.2px; }
 .bubble.reaction::after { border-top-color: #ffe6bf; }
 
+/* Hjerte/kys der stiger op mellem Stephan og Lisa i et kærligheds-øjeblik, se Avatars.tsx:LoveEffect. */
+.love-emoji-wrap { transform: translate(-50%, -50%); pointer-events: none; }
+.love-emoji { font-size: 34px; display: block; animation: love-rise 1.6s ease-out infinite; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); }
+@keyframes love-rise {
+  0% { transform: translateY(14px) scale(0.5); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateY(-55px) scale(1.2); opacity: 0; }
+}
+
 .vector-panel { top: 150px; right: 16px; width: 420px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; gap: 6px; }
 .vector-panel .live { margin-left: 6px; color: #e8710a; text-transform: none; letter-spacing: 0; font-weight: 600; }
 .vector-panel .hint { font-size: 12px; }

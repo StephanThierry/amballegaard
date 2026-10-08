@@ -128,4 +128,31 @@ public static class Speech
         do line = pool[rng.Next(pool.Count)]; while (pool.Count > 1 && line == a.Speech);
         return line;
     }
+
+    public static LoveScript RandomLoveScript(Random rng) => LoveScripts.All[rng.Next(LoveScripts.All.Count)];
+}
+
+/// <summary>En replik i et kærligheds-øjeblik. Speaker er "stephan", "lisa" eller "both" (begge siger den samtidig).</summary>
+public sealed record LoveLine(string Speaker, string Text);
+
+/// <summary>Et lille skuespil Stephan og Lisa opfører, når de står helt tæt sammen. <c>EndsWithKiss</c> afgør om
+/// kysse-emojien vises i stedet for hjertet på den sidste replik.</summary>
+public sealed record LoveScript(IReadOnlyList<LoveLine> Lines, bool EndsWithKiss);
+
+public static class LoveScripts
+{
+    private static LoveLine S(string t) => new("stephan", t);
+    private static LoveLine L(string t) => new("lisa", t);
+    private static LoveLine Both(string t) => new("both", t);
+
+    public static readonly IReadOnlyList<LoveScript> All =
+    [
+        new([Both("Kys")], EndsWithKiss: true),
+        new([S("Haps haps"), L("Uha skønt")], EndsWithKiss: false),
+        new([S("Skal vi have en date-aften snart?"), L("Ja tak, bare os to!")], EndsWithKiss: false),
+        new([S("Hvad ville jeg gøre uden dig?"), L("Nok rode rundt og lede efter dine nøgler for evigt.")], EndsWithKiss: false),
+        new([S("Du bliver smukkere for hver dag."), L("Charmør!")], EndsWithKiss: false),
+        new([S("Må jeg stjæle et kys?"), L("Kun hvis det bliver mere end ét.")], EndsWithKiss: true),
+        new([L("Duftiii"), S("Bedufti"), L("Strudsekys!"), S("Uftii!")], EndsWithKiss: false),
+    ];
 }

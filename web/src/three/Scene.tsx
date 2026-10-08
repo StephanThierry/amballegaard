@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { currentSimSeconds, useStore } from '../store'
 import type { House, P2 } from '../types'
-import { Avatars } from './Avatars'
+import { Avatars, LoveEffect } from './Avatars'
 import { Floors } from './Floors'
 import { Furniture } from './Furniture'
 import { facingSignature } from './layout'
@@ -101,6 +101,7 @@ function World({ house, center }: { house: House; center: THREE.Vector3 }) {
         <Roofs house={house} visible={roofVisible} />
         <Furniture />
         <Avatars />
+        <LoveEffect />
         <MowerAndDock />
       </group>
       <ObstacleReporter />

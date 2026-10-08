@@ -15,6 +15,24 @@ export function Avatars() {
   return <>{agents.filter((a) => active.split(',').includes(a.id)).map((a) => <Avatar key={a.id} info={a} />)}</>
 }
 
+/**
+ * Hjerte (eller kys, for de replikker der ender sådan) der stiger op midtvejs mellem Stephan og Lisa,
+ * mens serveren har dem i et kærligheds-øjeblik (World.LoveEffect) — se docs/3d-noter.md.
+ */
+export function LoveEffect() {
+  const kind = useStore((s) => s.snapshot?.loveEffect ?? null)
+  const stephan = useStore((s) => s.snapshot?.agents.find((a) => a.id === 'stephan'))
+  const lisa = useStore((s) => s.snapshot?.agents.find((a) => a.id === 'lisa'))
+  if (!kind || !stephan || !lisa) return null
+  const x = (stephan.x + lisa.x) / 2
+  const z = (stephan.z + lisa.z) / 2
+  return (
+    <Html position={[x, 1.9, z]} zIndexRange={[25, 0]} style={{ pointerEvents: 'none' }}>
+      <div className="love-emoji-wrap"><span className="love-emoji">{kind === 'kiss' ? '💋' : '❤️'}</span></div>
+    </Html>
+  )
+}
+
 function Avatar({ info }: { info: AgentInfo }) {
   const root = useRef<THREE.Group>(null)
   const legL = useRef<THREE.Group>(null), legR = useRef<THREE.Group>(null)
