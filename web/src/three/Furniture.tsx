@@ -1195,6 +1195,14 @@ function WingChair({ color }: { color: string }) {
     color: new THREE.Color(color).offsetHSL(0.01, -0.05, -0.04), roughness: 1,
   }), [color])
   const W = 0.9, D = 0.88, skirt = 0.2
+  // Armlænets og bundens forkant trukket ind til at flugte med sædets nu 20% kortere dybde (sæde
+  // forkant z=0.27); bagkanten er uændret og forbliver ankeret til ryglænet/skørtets bagside.
+  const armFront = 0.27, armBack = -0.37
+  const armDepth = armFront - armBack
+  const armZ = (armFront + armBack) / 2
+  const baseFront = armFront + 0.02, baseBack = -D / 2
+  const baseDepth = baseFront - baseBack
+  const baseZ = (baseFront + baseBack) / 2
 
   const geo = useMemo(() => {
     // Ryg: lige sider, skuldre og buet top (bredde 0.64, højde til 1.04).
@@ -1215,8 +1223,8 @@ function WingChair({ color }: { color: string }) {
   const fringeRef = useRef<THREE.InstancedMesh>(null)
   const spacing = 0.009
   const perimeter: [number, number, number][] = []
-  for (let x = -W / 2; x <= W / 2; x += spacing) { perimeter.push([x, D / 2 + 0.006, 0]); perimeter.push([x, -D / 2 - 0.006, 0]) }
-  for (let z = -D / 2; z <= D / 2; z += spacing) { perimeter.push([W / 2 + 0.006, z, 1]); perimeter.push([-W / 2 - 0.006, z, 1]) }
+  for (let x = -W / 2; x <= W / 2; x += spacing) { perimeter.push([x, baseFront + 0.006, 0]); perimeter.push([x, baseBack - 0.006, 0]) }
+  for (let z = baseBack; z <= baseFront; z += spacing) { perimeter.push([W / 2 + 0.006, z, 1]); perimeter.push([-W / 2 - 0.006, z, 1]) }
   useLayoutEffect(() => {
     const mat = new THREE.Matrix4()
     const q = new THREE.Quaternion()
@@ -1234,10 +1242,10 @@ function WingChair({ color }: { color: string }) {
   const armY = 0.2
   return (
     <group>
-      {/* Underkrop/skørt og bånd over frynserne */}
-      <RoundedBox args={[W - 0.02, 0.32, D - 0.02]} radius={0.03} smoothness={3} position={[0, skirt + 0.06, 0]} material={m} castShadow receiveShadow />
-      <mesh material={fringeMat} position={[0, skirt - 0.012, 0]} castShadow>
-        <boxGeometry args={[W + 0.016, 0.022, D + 0.016]} />
+      {/* Underkrop/skørt og bånd over frynserne — forkant trukket ind til at matche sædet */}
+      <RoundedBox args={[W - 0.02, 0.32, baseDepth - 0.02]} radius={0.03} smoothness={3} position={[0, skirt + 0.06, baseZ]} material={m} castShadow receiveShadow />
+      <mesh material={fringeMat} position={[0, skirt - 0.012, baseZ]} castShadow>
+        <boxGeometry args={[W + 0.016, 0.022, baseDepth + 0.016]} />
       </mesh>
       <instancedMesh ref={fringeRef} args={[undefined, fringeMat, perimeter.length]} castShadow>
         <boxGeometry args={[0.005, 0.17, 0.005]} />
@@ -1246,12 +1254,12 @@ function WingChair({ color }: { color: string }) {
       <RoundedBox args={[0.62, 0.15, 0.56]} radius={0.065} smoothness={5} position={[0, 0.5, -0.01]} material={m} castShadow receiveShadow />
       {/* Ryg, let bagoverhældende */}
       <mesh geometry={geo.back} material={m} position={[0, 0.42, -D / 2 + 0.1]} rotation={[-0.12, 0, 0]} castShadow receiveShadow />
-      {/* Almindelige polstrede armlæn med rullet top */}
+      {/* Almindelige polstrede armlæn med rullet top — forkant flugter med sædet, bagkant uændret */}
       {[-1, 1].map((s) => (
-        <group key={s} position={[s * (W / 2 - 0.065), armY, 0.02]}>
-          <RoundedBox args={[0.13, 0.4, 0.78]} radius={0.04} smoothness={4} position={[0, 0.2, 0]} material={m} castShadow receiveShadow />
+        <group key={s} position={[s * (W / 2 - 0.065), armY, armZ]}>
+          <RoundedBox args={[0.13, 0.4, armDepth]} radius={0.04} smoothness={4} position={[0, 0.2, 0]} material={m} castShadow receiveShadow />
           <mesh material={m} position={[s * 0.01, 0.41, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-            <capsuleGeometry args={[0.075, 0.66, 8, 20]} />
+            <capsuleGeometry args={[0.075, armDepth - 0.12, 8, 20]} />
           </mesh>
         </group>
       ))}
