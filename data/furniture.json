@@ -67,7 +67,7 @@
     {"id": "seng-maxemil", "name": "Max-Emils seng", "room": "v2", "kind": "bed", "pos": [22.25, 9.2], "rot": -90, "w": 0.9, "duvet": "#3d6fb0"},
     {"id": "skrivebord-maxemil", "name": "Max-Emils skrivebord", "room": "v2", "kind": "desk", "pos": [22.6, 7.05], "rot": 0, "w": 1},
     {"id": "garderobe-maxemil", "name": "Max-Emils garderobeskab", "room": "v2", "kind": "wardrobe", "pos": [20.43, 8.95], "rot": 90, "w": 1.1},
-    {"id": "fodbold", "name": "Fodbold", "room": "v2", "kind": "ball", "pos": [21.05, 7.55]},
+    {"id": "basketball", "name": "Basketball (orange, kan trækkes rundt og hopper realistisk)", "room": "v2", "kind": "ball", "pos": [21.05, 7.55]},
     {"id": "toilet-badN", "name": "Væghængt toilet (bad, østvæggen)", "room": "badN", "kind": "toilet", "pos": [23.09, 0.51], "rot": -90},
     {"id": "haandvask-badN", "name": "Håndvask (bad)", "room": "badN", "kind": "vanity", "pos": [21.55, 1.66], "rot": 180, "w": 1},
     {"id": "bruser", "name": "Bruseniche", "room": "badN", "kind": "shower", "pos": [22.83, 1.4], "rot": 0},

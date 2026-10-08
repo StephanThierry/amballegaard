@@ -12,6 +12,7 @@ import { StaticBatch } from './StaticBatch'
 import { Clickable, toggleProps } from './interact'
 import { ShowScreen } from './TvShow'
 import { SHOWS } from './show'
+import { Basketball } from './Ball'
 
 type V3 = [number, number, number]
 
@@ -44,7 +45,6 @@ const fm = (() => {
       screen: s({ color: '#0a0b0d', roughness: 0.15, emissive: '#1a2a3a', emissiveIntensity: 0.15 }),
       clothes: ['#3b4a63', '#c7b299', '#7a2f2f', '#e7e3db', '#4f5d4a', '#2b2b2e'].map((c) => s({ color: c, roughness: 1 })),
       dogBed: s({ color: '#8b7d6b', roughness: 1 }),
-      ball: s({ color: '#f2f2f2', roughness: 0.6 }),
       kettle: s({ color: '#141416', roughness: 0.35, metalness: 0.3 }),
     }
   }
@@ -2480,24 +2480,32 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'bookshelf': return <Bookshelf w={it.w} h={it.height} d={it.d} color={it.color} />
     case 'dogBed': return <Box p={[0, 0.06, 0]} s={[0.9, 0.12, 0.65]} m={f.dogBed} />
     case 'rug': return <Box p={[0, 0.006, 0]} s={[it.w ?? 1, 0.012, it.d ?? 1]} m={colorMat(it.color ?? '#cfc5b4')} shadow={false} />
-    case 'ball': return <mesh material={f.ball} position={[0, 0.11, 0]} castShadow><sphereGeometry args={[0.11, 20, 14]} /></mesh>
     default:
       console.warn('Ukendt møbeltype', it.kind, it.id)
       return null
   }
 }
 
-/** Alt inventar fra data/furniture.json. Hver gruppe bærer sit møbel-id, så vektorværktøjet kan se, hvad der peges på. */
+/**
+ * Alt inventar fra data/furniture.json. Hver gruppe bærer sit møbel-id, så vektorværktøjet kan se, hvad der peges på.
+ * Basketballen renders uden for StaticBatch og den fælles positions-wrapper: den flytter og hopper i verdenskoordinater
+ * hvert billede (træk-og-slip, fysik), så den skal ikke flettes sammen med det statiske inventar.
+ */
 export function Furniture() {
   const batch = QUALITY[useStore((s) => s.quality)].batch
+  const balls = furnitureItems.filter((it) => it.kind === 'ball')
+  const rest = furnitureItems.filter((it) => it.kind !== 'ball')
   return (
-    <StaticBatch enabled={batch}>
-      {furnitureItems.map((it) => (
-        <group key={it.id} position={[it.pos[0], it.y ?? 0, it.pos[1]]} rotation={[0, ((it.rot ?? 0) * Math.PI) / 180, 0]} scale={it.scale ?? 1}
-          userData={{ furnitureId: it.id }}>
-          <Suspense fallback={null}>{renderItem(it)}</Suspense>
-        </group>
-      ))}
-    </StaticBatch>
+    <>
+      <StaticBatch enabled={batch}>
+        {rest.map((it) => (
+          <group key={it.id} position={[it.pos[0], it.y ?? 0, it.pos[1]]} rotation={[0, ((it.rot ?? 0) * Math.PI) / 180, 0]} scale={it.scale ?? 1}
+            userData={{ furnitureId: it.id }}>
+            <Suspense fallback={null}>{renderItem(it)}</Suspense>
+          </group>
+        ))}
+      </StaticBatch>
+      {balls.map((it) => <Basketball key={it.id} pos={it.pos} />)}
+    </>
   )
 }

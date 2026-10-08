@@ -35,6 +35,16 @@ export function pointInPolygon(p: P2, poly: P2[]) {
   return inside
 }
 
+/** Er punktet ude på plænen (inden for grunden, men hverken inde i huset, på terrassen eller i indkørslen)? */
+export function isOnLawn(house: House, p: P2): boolean {
+  const [[x0, z0], [x1, z1]] = house.site.bounds
+  if (p[0] < x0 || p[0] > x1 || p[1] < z0 || p[1] > z1) return false
+  if (pointInPolygon(p, house.exterior)) return false
+  if (pointInPolygon(p, house.site.terrace)) return false
+  if (pointInPolygon(p, house.site.driveway)) return false
+  return true
+}
+
 export function openingHeights(o: Opening): { sill: number; head: number } {
   switch (o.type) {
     case 'window': return { sill: o.sill ?? 0.9, head: o.height ? (o.sill ?? 0.9) + o.height : 2.25 }

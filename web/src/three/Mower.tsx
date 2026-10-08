@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { toggleMower, useStore } from '../store'
 import { Clickable } from './interact'
+import { isOnLawn } from './layout'
 
 /** Ladestationens placering (skal matche Mower.Dock i simulationen). */
 const DOCK = { x: 19.35, z: 17.6 }
@@ -33,6 +34,13 @@ const mats = (() => {
 const INDICATOR_GREEN = new THREE.Color('#5fe08a')
 const INDICATOR_RED = new THREE.Color('#ff4d3d')
 
+/** Græskast: få genbrugte partikler der kastes op under klipperen. Kun aktive, mens den klipper på græs. */
+const CLIP_COUNT = 16
+const clipGeometry = new THREE.BoxGeometry(0.012, 0.012, 0.055)
+const clipMaterial = new THREE.MeshStandardMaterial({ color: '#5f8f33', roughness: 0.85 })
+type Clip = { life: number; x: number; y: number; z: number; vx: number; vy: number; vz: number; rx: number; ry: number; rz: number }
+const makeClip = (): Clip => ({ life: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0 })
+
 /**
  * Robotklipperen startes/stoppes ved klik — både på ladestationen og på selve robotten,
  * så man kan ramme den uanset om den står i dokken eller er ude at køre.
@@ -52,6 +60,11 @@ function RobotMower() {
   const root = useRef<THREE.Group>(null)
   const wheels = useRef<THREE.Group[]>([])
   const st = useRef({ init: false, pos: new THREE.Vector3(), heading: 0, roll: 0 })
+  const clips = useRef<THREE.InstancedMesh>(null)
+  const clipState = useRef<Clip[]>(Array.from({ length: CLIP_COUNT }, makeClip))
+  const clipNext = useRef(0)
+  const clipTimer = useRef(0)
+  const dummy = useMemo(() => new THREE.Object3D(), [])
   useFrame((_, dt) => {
     const s = useStore.getState().snapshot?.mower
     const g = root.current
@@ -81,8 +94,51 @@ function RobotMower() {
       m.charge.emissive.copy(INDICATOR_GREEN)
       m.charge.emissiveIntensity = 0.5
     }
+
+    // Græskast: kun mens den aktivt klipper på en græsflade — stopper med det samme på fliser/terrasse/i dokken.
+    const house = useStore.getState().house
+    const onLawn = s.state === 'mowing' && house ? isOnLawn(house, [v.pos.x, v.pos.z]) : false
+    clipTimer.current -= dt
+    if (onLawn && clipTimer.current <= 0) {
+      clipTimer.current = 0.05
+      for (let i = 0; i < 2; i++) {
+        const c = clipState.current[clipNext.current]
+        clipNext.current = (clipNext.current + 1) % CLIP_COUNT
+        const ang = Math.random() * Math.PI * 2, r = 0.06 + Math.random() * 0.12
+        c.life = 0.4 + Math.random() * 0.25
+        c.x = v.pos.x + Math.cos(ang) * r
+        c.z = v.pos.z + Math.sin(ang) * r
+        c.y = 0.03
+        c.vx = Math.cos(ang) * (0.25 + Math.random() * 0.35)
+        c.vz = Math.sin(ang) * (0.25 + Math.random() * 0.35)
+        c.vy = 0.7 + Math.random() * 0.6
+        c.rx = Math.random() * Math.PI; c.ry = Math.random() * Math.PI; c.rz = Math.random() * Math.PI
+      }
+    }
+    if (clips.current) {
+      for (let i = 0; i < CLIP_COUNT; i++) {
+        const c = clipState.current[i]
+        if (c.life > 0) {
+          c.life -= dt
+          c.vy -= 6 * dt
+          c.x += c.vx * dt; c.y += c.vy * dt; c.z += c.vz * dt
+          if (c.y < 0.01) { c.y = 0.01; c.vy = 0 }
+          dummy.position.set(c.x, c.y, c.z)
+          dummy.rotation.set(c.rx, c.ry + c.life * 4, c.rz)
+          dummy.scale.setScalar(Math.max(0, Math.min(1, c.life * 3)))
+        } else {
+          dummy.position.set(0, -5, 0)
+          dummy.scale.setScalar(0)
+        }
+        dummy.updateMatrix()
+        clips.current.setMatrixAt(i, dummy.matrix)
+      }
+      clips.current.instanceMatrix.needsUpdate = true
+    }
   })
   return (
+    <>
+    <instancedMesh ref={clips} args={[clipGeometry, clipMaterial, CLIP_COUNT]} frustumCulled={false} />
     <group ref={root}>
       {/* Underkrop og skal */}
       <RoundedBox args={[0.46, 0.12, 0.66]} radius={0.05} smoothness={4} position={[0, 0.13, 0]} material={m.dark} castShadow />
@@ -112,6 +168,7 @@ function RobotMower() {
       {/* Ladeindikator */}
       <mesh material={m.charge} position={[0, 0.278, 0.12]}><boxGeometry args={[0.08, 0.004, 0.012]} /></mesh>
     </group>
+    </>
   )
 }
 

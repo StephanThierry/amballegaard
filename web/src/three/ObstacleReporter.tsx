@@ -3,6 +3,14 @@ import { useRef } from 'react'
 import * as THREE from 'three'
 import { setObstacles, useStore } from '../store'
 
+export type ObstacleRect = { id: string; x0: number; z0: number; x1: number; z1: number }
+
+let lastRects: ObstacleRect[] = []
+/** Møblernes fodaftryk som sidst sendt til serveren — til klientside-brug (fx bolden, der ikke må lande i dem). */
+export function getObstacleRects(): readonly ObstacleRect[] {
+  return lastRects
+}
+
 /**
  * Måler møblernes faktiske fodaftryk (også glTF-modeller, som serveren ikke kender størrelsen på) og sender
  * dem til serveren, så beboernes rutefinding går uden om dem. Kun ting der står på gulvet tæller —
@@ -19,7 +27,7 @@ export function ObstacleReporter() {
     nextCheck.current = clock.elapsedTime + 3
     if (!useStore.getState().connected) return
 
-    const rects: { id: string; x0: number; z0: number; x1: number; z1: number }[] = []
+    const rects: ObstacleRect[] = []
     scene.traverse((o) => {
       const id = o.userData?.furnitureId as string | undefined
       if (!id) return
@@ -30,6 +38,7 @@ export function ObstacleReporter() {
       if (!touchesFloor || !tallEnough) return
       rects.push({ id, x0: round(b.min.x), z0: round(b.min.z), x1: round(b.max.x), z1: round(b.max.z) })
     })
+    if (rects.length > 0) lastRects = rects
     const key = JSON.stringify(rects)
     if (key === last.current || rects.length === 0) return
     last.current = key
