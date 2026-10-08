@@ -200,13 +200,133 @@ function Plush({ kind, color, accent }: { kind: number; color: string; accent: s
   }
 }
 
-function Wardrobe({ p, rot = 0, w, h = 2.2, d = 0.6 }: { p: V3; rot?: number; w: number; h?: number; d?: number }) {
+const wardrobeMats = (() => {
+  let cache: ReturnType<typeof create> | null = null
+  function create() {
+    const s = (p: THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial(p)
+    return {
+      rod: s({ color: '#9a9ea1', roughness: 0.3, metalness: 0.7 }),
+      shelf: s({ color: '#e7e2d8', roughness: 0.5 }),
+      shoeBrown: s({ color: '#6b4a32', roughness: 0.7 }),
+      shoeWhite: s({ color: '#f2f1ec', roughness: 0.4 }),
+      towel: ['#f2f1ec', '#cfe3ea', '#f0d7b0'].map((c) => s({ color: c, roughness: 0.9 })),
+      bottle: ['#3f7a4a', '#2f6db0', '#c9a63d'].map((c) => s({ color: c, roughness: 0.25, metalness: 0.1 })),
+      office: ['#2b2b2e', '#3b4a63', '#7b7f86', '#e7e3db'].map((c) => s({ color: c, roughness: 1 })),
+      boy: ['#2f6db0', '#e8784f', '#4f9a3c', '#f2d16b'].map((c) => s({ color: c, roughness: 1 })),
+      girl: ['#e7a7b4', '#f2d16b', '#c75b6a', '#ffffff'].map((c) => s({ color: c, roughness: 1 })),
+      garage: ['#4a5a3c', '#5a4632', '#1d1e20'].map((c) => s({ color: c, roughness: 1 })),
+    }
+  }
+  return () => (cache ??= create())
+})()
+
+/**
+ * Skabets indhold, synligt når lågerne åbnes. `contents` (fra furniture.json) styrer temaet:
+ * "utility" = hylder med håndklæder og rengøringsmidler, ellers stang med tøj + hylde + sko,
+ * i en palet der passer til rummet ("office", "boy", "girl", "garage").
+ */
+function WardrobeInterior({ w, h, d, contents = 'office' }: { w: number; h: number; d: number; contents?: string }) {
+  const wm = wardrobeMats()
+  const innerW = w - 0.08
+  const shelfD = d - 0.14
+  // Centrum for ting der står foran på hylden/gulvet — holdt godt bag lågernes inderside (d/2-0.025),
+  // så intet af indholdet stikker igennem lågen når den er lukket.
+  const zFront = d / 2 - 0.2
+
+  if (contents === 'utility') {
+    const shelfYs = [0.3, 0.75, 1.2, 1.65]
+    const nTowels = Math.max(2, Math.round(innerW / 0.22))
+    const nBottles = Math.max(2, Math.round(innerW / 0.18))
+    return (
+      <group>
+        {shelfYs.map((y) => <Box key={y} p={[0, y, 0]} s={[innerW, 0.02, shelfD]} m={wm.shelf} />)}
+        {shelfYs.slice(0, 3).map((y, si) => Array.from({ length: nTowels }, (_, i) => {
+          const x = -innerW / 2 + (i + 0.5) * (innerW / nTowels)
+          const stackH = 0.08 + ((i + si) % 3) * 0.03
+          return <Box key={`${si}-${i}`} p={[x, y + 0.01 + stackH / 2, zFront]} s={[innerW / nTowels - 0.03, stackH, 0.18]} m={wm.towel[(i + si) % wm.towel.length]} />
+        }))}
+        {/* Rengøringsmidler nederst */}
+        {Array.from({ length: nBottles }, (_, i) => (
+          <mesh key={i} material={wm.bottle[i % wm.bottle.length]} position={[-innerW / 2 + (i + 0.5) * (innerW / nBottles), 0.11, zFront]}>
+            <cylinderGeometry args={[0.035, 0.04, 0.2, 10]} />
+          </mesh>
+        ))}
+      </group>
+    )
+  }
+
+  // Hænge-tema: stang med tøj, hylde med sammenlagt tøj ovenover, sko i bunden
+  const palette = wm[contents as 'office' | 'boy' | 'girl' | 'garage'] ?? wm.office
+  const rodY = h * 0.76
+  const nHang = Math.max(2, Math.round(innerW / 0.2))
+  const nFolded = Math.max(2, Math.round(innerW / 0.16))
+  const nShoes = Math.max(1, Math.round(innerW / 0.3))
+  const garmentLen = contents === 'boy' || contents === 'girl' ? 0.42 : 0.6
+  return (
+    <group>
+      <mesh material={wm.rod} position={[0, rodY, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.009, 0.009, innerW, 10]} />
+      </mesh>
+      {Array.from({ length: nHang }, (_, i) => {
+        const x = -innerW / 2 + (i + 0.5) * (innerW / nHang)
+        return (
+          <group key={i} position={[x, rodY, 0]}>
+            <mesh material={wm.rod} position={[0, -0.02, 0]}><cylinderGeometry args={[0.004, 0.004, 0.04, 6]} /></mesh>
+            <RoundedBox args={[0.16, garmentLen, 0.06]} radius={0.02} smoothness={2} position={[0, -garmentLen / 2 - 0.03, 0]} material={palette[i % palette.length]} castShadow />
+          </group>
+        )
+      })}
+      {/* Hylde over stangen med sammenlagt tøj */}
+      <Box p={[0, rodY + 0.22, 0]} s={[innerW, 0.02, shelfD]} m={wm.shelf} />
+      {Array.from({ length: nFolded }, (_, i) => {
+        const x = -innerW / 2 + (i + 0.5) * (innerW / nFolded)
+        const stackH = 0.07 + (i % 3) * 0.025
+        return <Box key={i} p={[x, rodY + 0.23 + stackH / 2, zFront]} s={[innerW / nFolded - 0.025, stackH, 0.18]} m={palette[(i + 1) % palette.length]} />
+      })}
+      {/* Sko i bunden */}
+      {Array.from({ length: nShoes }, (_, i) => (
+        <RoundedBox key={i} args={[0.1, 0.07, 0.18]} radius={0.03} smoothness={2}
+          position={[-innerW / 2 + (i + 0.5) * (innerW / nShoes), 0.06, zFront]}
+          material={i % 2 === 0 ? wm.shoeBrown : wm.shoeWhite} castShadow />
+      ))}
+    </group>
+  )
+}
+
+/**
+ * Hvidt garderobeskab med hængslede låger (klik åbner/lukker, delt via serverens openDoors) og
+ * et hult korpus, så det temaede indhold (se `WardrobeInterior`) ses når man åbner det.
+ */
+function Wardrobe({ p, rot = 0, w, h = 2.2, d = 0.6, id, contents }: {
+  p: V3; rot?: number; w: number; h?: number; d?: number; id?: string; contents?: string
+}) {
   const f = fm()
   const doors = Math.max(1, Math.round(w / 0.5))
+  const gap = 0.006
+  const dw = (w - gap * (doors + 1)) / doors
+  const step = useApplianceOpen(id ?? '')
+  const doorRefs = useRef<(THREE.Group | null)[]>([])
+  useFrame((_, dt) => {
+    const t = step(dt)
+    doorRefs.current.forEach((g, i) => { if (g) g.rotation.y = (i % 2 === 0 ? -1 : 1) * t * 1.5 })
+  })
   return (
     <At p={p} rot={rot}>
-      <Box p={[0, h / 2, -0.011]} s={[w, h, d - 0.022]} m={f.whiteMatte} />
-      <CabinetDoors w={w} h={h} y0={0} z={d / 2 - 0.011} count={doors} m={f.whiteMatte} />
+      <Carcass cw={w} H={h} D={d} y0={0.05} m={f.whiteMatte} />
+      <WardrobeInterior w={w} h={h} d={d} contents={contents} />
+      {Array.from({ length: doors }, (_, i) => {
+        const center = -w / 2 + gap + dw / 2 + i * (dw + gap)
+        const hingeLeft = i % 2 === 0
+        const hingeX = hingeLeft ? center - dw / 2 : center + dw / 2
+        const localX = hingeLeft ? dw / 2 : -dw / 2
+        return (
+          <group key={i} ref={(el) => { doorRefs.current[i] = el }} position={[hingeX, 0, d / 2 - 0.011]} userData={{ dynamic: true }}>
+            <group {...(id ? toggleProps(id) : {})}>
+              <RoundedBox args={[dw, h - 2 * gap, 0.022]} radius={0.005} smoothness={2} position={[localX, h / 2, 0]} material={f.whiteMatte} castShadow receiveShadow />
+            </group>
+          </group>
+        )
+      })}
     </At>
   )
 }
@@ -2027,15 +2147,16 @@ function KitchenTall({ w = 2.2, fridgeId = 'koeleskab', freezerId = 'fryser' }: 
 }
 
 /** Hul korpus (bag, sider, top, bund) så indholdet ses når lågen/skufferne åbnes. */
-function Carcass({ cw, H, D, y0 = 0.1 }: { cw: number; H: number; D: number; y0?: number }) {
+function Carcass({ cw, H, D, y0 = 0.1, m }: { cw: number; H: number; D: number; y0?: number; m?: THREE.Material }) {
   const f = fm()
+  const mat = m ?? f.white
   const T = 0.018
   return (
     <group>
-      <Box p={[0, (H + y0) / 2, -D / 2 + T / 2 - 0.011]} s={[cw, H - y0, T]} m={f.white} />
-      {[-1, 1].map((s) => <Box key={s} p={[s * (cw / 2 - T / 2), (H + y0) / 2, -0.011]} s={[T, H - y0, D]} m={f.white} />)}
-      <Box p={[0, H - T / 2, -0.011]} s={[cw, T, D]} m={f.white} />
-      <Box p={[0, y0 + T / 2, -0.011]} s={[cw, T, D]} m={f.white} />
+      <Box p={[0, (H + y0) / 2, -D / 2 + T / 2 - 0.011]} s={[cw, H - y0, T]} m={mat} />
+      {[-1, 1].map((s) => <Box key={s} p={[s * (cw / 2 - T / 2), (H + y0) / 2, -0.011]} s={[T, H - y0, D]} m={mat} />)}
+      <Box p={[0, H - T / 2, -0.011]} s={[cw, T, D]} m={mat} />
+      <Box p={[0, y0 + T / 2, -0.011]} s={[cw, T, D]} m={mat} />
     </group>
   )
 }
@@ -2694,7 +2815,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'model': return <Model name={it.model!} p={O} height={it.height} width={it.width} hide={it.hide} />
     case 'roundTable': return <RoundTable d={it.w} color={it.color} />
     case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} squarePillows={it.squarePillows} />
-    case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} />
+    case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} id={it.id} contents={it.contents} />
     case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} screenRot={((it.screenRot ?? 0) * Math.PI) / 180} noScreen={it.noScreen} />
     case 'keyboard': return <Keyboard />
     case 'officeChair': return <OfficeChair p={O} />
