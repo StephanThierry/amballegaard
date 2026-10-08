@@ -2441,6 +2441,7 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
   const inner = w - 2 * arm
   const back = useRef<THREE.Group>(null)
   const ext = useRef<THREE.Group>(null)
+  const legs = useRef<THREE.Group>(null)
   const openT = useRef(0)
   const step = useApplianceOpen(id ?? '')
   // Siddehynden er ÉN sammenhængende del (ikke to), på samme niveau som udtræksdelen, så bunden flugter
@@ -2456,11 +2457,21 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
   // Åben: udtræksdelens bagkant flugter præcis med sædets forkant, så liggefladen er sammenhængende
   // uden hul.
   const extOpenZ = seatZ + seatD / 2
+  // Benene under udtræksdelen: hængslet op mod undersiden, pivot nær udtræksdelens yderkant.
+  const legLen = 0.35
+  const legPivotY = 0.36
+  const legPivotZ = 2 * extHalf - 0.1
+  // Delt t splittes i to faser, så glid og benfold aldrig sker samtidig:
+  // ud (t 0→1): glider ud (0→0,5), så folder benene ned (0,5→1).
+  // ind (t 1→0): folder benene op (1→0,5), så glider ind (0,5→0) — ingen "svævende" ben undervejs.
   useFrame((_, dt) => {
     const t = step(dt)
     openT.current = t
+    const slideT = Math.min(t / 0.5, 1)
+    const legT = Math.min(Math.max((t - 0.5) / 0.5, 0), 1)
     if (back.current) back.current.rotation.x = t * (Math.PI / 2 - 0.03)
-    if (ext.current) ext.current.position.z = extClosedZ + t * (extOpenZ - extClosedZ)
+    if (ext.current) ext.current.position.z = extClosedZ + slideT * (extOpenZ - extClosedZ)
+    if (legs.current) legs.current.rotation.x = (1 - legT) * (Math.PI / 2)
   })
   return (
     <Clickable onActivate={() => id && toggleDoor(id)} enabled={!!id}>
@@ -2471,6 +2482,15 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
             oven i sædet når den er lukket, og glider frem og fordobler liggefladen når sofaen foldes ud */}
         <group ref={ext} position={[0, 0, extClosedZ]}>
           <RoundedBox args={[inner, 0.16, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.44, extHalf]} material={m} castShadow receiveShadow />
+          {/* Ben under udtræksdelen: foldet op (skjult under madrassen) når lukket, folder ned til
+              gulvet først når delen er glidet helt ud — se faseopdelingen af legT/slideT ovenfor. */}
+          <group ref={legs} position={[0, legPivotY, legPivotZ]}>
+            {[-1, 1].map((s) => (
+              <mesh key={s} material={f.darkWood} position={[s * (inner / 2 - 0.08), -legLen / 2, 0]} castShadow>
+                <cylinderGeometry args={[0.02, 0.016, legLen, 10]} />
+              </mesh>
+            ))}
+          </group>
         </group>
         {/* Rygpude: hængslet ved sædet, vipper fremad og ned i stedet for at stå op, når sofaen folder ud */}
         <group ref={back} position={[0, 0.36, -d / 2 + 0.02]}>
