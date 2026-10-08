@@ -216,6 +216,14 @@ dotnet test                    # 27 tests, kun .NET-siden
   kan være svære eller umulige at se på et screenshot. Ser noget "forsvundet" (fx farvet vand, en lille
   diode) ud som ren hvid/overeksponeret flade ved lav grafikkvalitet, så prøv `Mellem` eller højere, før
   du antager en render-fejl i koden.
+- **Chrome-fanen i den automatiserede test kører med `document.hidden = true`**, hvilket kraftigt
+  throttler/pauser `requestAnimationFrame` — og dermed al `useFrame`-baseret fysik/animation (træk,
+  hop, kontinuerlige bevægelser). Et rigtigt CDP-klik (`computer.left_click`) trigger diskrete
+  tilstandsskift pålideligt og synes kortvarigt at un-throttle renderingen bagefter, men syntetiske
+  `PointerEvent`s til at simulere træk er upålidelige (virker nogle gange, ikke andre). Kontinuerlig
+  fysik (bolden der hopper, robotklipperens bevægelse) kan derfor ikke verificeres pålideligt via
+  automatiserede skærmbilleder — det er en begrænsning i testmiljøet, ikke nødvendigvis et tegn på en
+  kodefejl.
 
 **Visuel verifikation i browseren** (Claude in Chrome)
 

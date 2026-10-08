@@ -2281,12 +2281,15 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
   const ext = useRef<THREE.Group>(null)
   const openT = useRef(0)
   const step = useApplianceOpen(id ?? '')
-  const open = useStore((s) => s.snapshot?.openDoors.includes(id ?? '') ?? false)
-  // Udtræksmadrassens dybde og dens to endestillinger: lukket ligger den præcis oven i sædet (skjult,
-  // samme fodaftryk som sædet), åben glider den frem så liggefladen næsten fordobles.
+  // Siddehynden er ÉN sammenhængende del (ikke to), på samme niveau som udtræksdelen, så bunden flugter
+  // i højden hele vejen, uanset om sofaen er lukket eller foldet ud.
+  const seatD = d - 0.2
+  const seatZ = 0.08
   const extHalf = (d - 0.1) / 2
-  const extClosedZ = -extHalf
-  const extOpenZ = d / 2
+  // Lukket: centreret om siddehynden, så den kun stikker lidt (og lige meget) ud til begge sider — ikke
+  // synligt bagtil som en separat, lavere del.
+  const extClosedZ = seatZ
+  const extOpenZ = seatZ + seatD / 2 + extHalf
   useFrame((_, dt) => {
     const t = step(dt)
     openT.current = t
@@ -2297,13 +2300,11 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
     <Clickable onActivate={() => id && toggleDoor(id)} enabled={!!id}>
       <group>
         <RoundedBox args={[w, 0.26, d]} radius={0.03} smoothness={3} position={[0, 0.23, 0]} material={m} castShadow receiveShadow />
-        {[-1, 1].map((s) => (
-          <RoundedBox key={s} args={[inner / 2 - 0.01, 0.16, d - 0.2]} radius={0.06} smoothness={4} position={[s * inner / 4, 0.44, 0.08]} material={m} castShadow receiveShadow />
-        ))}
-        {/* Udtræksmadras: ligger skjult oven i sædet når den er lukket, og glider frem og fordobler liggefladen når sofaen foldes ud */}
+        <RoundedBox args={[inner, 0.16, seatD]} radius={0.06} smoothness={4} position={[0, 0.44, seatZ]} material={m} castShadow receiveShadow />
+        {/* Udtræksdel: samme stof og samme højde som siddehynden, så den flugter med bunden — ligger skjult
+            oven i sædet når den er lukket, og glider frem og fordobler liggefladen når sofaen foldes ud */}
         <group ref={ext} position={[0, 0, extClosedZ]}>
-          <RoundedBox args={[inner, 0.22, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.2, extHalf]} material={m} castShadow receiveShadow />
-          {open && <Box p={[0, 0.33, extHalf]} s={[inner - 0.06, 0.07, d - 0.22]} m={f.linen} />}
+          <RoundedBox args={[inner, 0.16, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.44, extHalf]} material={m} castShadow receiveShadow />
         </group>
         {/* Rygpude: hængslet ved sædet, vipper fremad og ned i stedet for at stå op, når sofaen folder ud */}
         <group ref={back} position={[0, 0.36, -d / 2 + 0.02]}>
