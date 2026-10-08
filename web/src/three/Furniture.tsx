@@ -7,6 +7,8 @@ import { createGame } from './games'
 import { getMaterials } from './materials'
 import { meterBox } from './util'
 import furnitureData from '../../../data/furniture.json'
+import { QUALITY } from './quality'
+import { StaticBatch } from './StaticBatch'
 
 type V3 = [number, number, number]
 
@@ -326,7 +328,7 @@ function Toilet({ id }: { id?: string }) {
       <mesh geometry={geo.hole} material={m.inner} position={[0, 0.396, seatZ]} />
       <mesh geometry={geo.seat} material={f.porcelain} position={[0, 0.4, seatZ]} castShadow />
       {/* Låg: hængslet bagtil, klik løfter det op mod væggen */}
-      <group ref={lid} position={[0, 0.422, 0.04]}>
+      <group ref={lid} position={[0, 0.422, 0.04]} userData={{ dynamic: true }}>
         <group {...(id ? applianceClick(id) : {})}>
           <mesh geometry={geo.lid} material={f.porcelain} position={[0, 0, seatZ - 0.04]} castShadow />
         </group>
@@ -2377,14 +2379,15 @@ function renderItem(it: FurnitureItem): ReactNode {
 
 /** Alt inventar fra data/furniture.json. Hver gruppe bærer sit møbel-id, så vektorværktøjet kan se, hvad der peges på. */
 export function Furniture() {
+  const batch = QUALITY[useStore((s) => s.quality)].batch
   return (
-    <group>
+    <StaticBatch enabled={batch}>
       {furnitureItems.map((it) => (
         <group key={it.id} position={[it.pos[0], it.y ?? 0, it.pos[1]]} rotation={[0, ((it.rot ?? 0) * Math.PI) / 180, 0]} scale={it.scale ?? 1}
           userData={{ furnitureId: it.id }}>
           <Suspense fallback={null}>{renderItem(it)}</Suspense>
         </group>
       ))}
-    </group>
+    </StaticBatch>
   )
 }

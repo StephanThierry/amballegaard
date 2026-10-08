@@ -52,6 +52,10 @@ Tests: `dotnet test`
 - Beboerne siger tilfældige ting i talebobler (50 replikker i `src/Amballegaard.Simulation/Agents/Speech.cs`)
 - **Døre**: klik på en dør for at åbne/lukke den; beboerne åbner selv de døre de går igennem
 - **Garageportene** (ledporte der kører op og ind langs loftet) åbnes/lukkes med den lysende knap på indersiden ved hver port
+- **Grafik** (øverst til venstre): slider fra *Ydelse* til *Kvalitet* i fem trin (Minimal, Lav, Mellem, Høj, Ultra — se `web/src/three/quality.ts`).
+  Ved første opstart på en GPU måles hardwaren, og niveauet sættes så scenen holder ~30 fps (gemmes lokalt; *Mål igen* gentager målingen).
+  *Adaptiv ydelse* sænker opløsning, AO og skyggeopdatering mens kameraet bevæger sig og tegner alt i fuld kvalitet, når det står stille.
+  Minimal–Mellem slår statiske møbler/vinduer sammen til få meshes (`StaticBatch.tsx`), fordi svage CPU'er begrænses af antallet af draw calls
 - **📐 Vektor** (tasten V): træk med musen fra et møbel til hvor det skal hen. Teksten kopieres automatisk og kan indsættes i Claude, som så retter `data/furniture.json` (se CLAUDE.md). Esc afslutter
 
 ## Status

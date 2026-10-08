@@ -5,19 +5,22 @@ import { toggleDoor, useStore } from '../store'
 import type { House, P2, WallMode } from '../types'
 import { layoutWalls, wallTop, type PlacedOpening, type WallSegment } from './layout'
 import { getMaterials } from './materials'
+import { QUALITY } from './quality'
+import { StaticBatch } from './StaticBatch'
 
 const F = 0.055 // rammebredde
 const GAP = 0.003
 
 /** Vinduer, glasdøre, hoveddør, garageporte og indvendige døre placeret i vægåbningerne. */
 export function Openings({ house, mode, cam }: { house: House; mode: WallMode; cam: P2 }) {
+  const batch = QUALITY[useStore((s) => s.quality)].batch
   return (
-    <group>
+    <StaticBatch enabled={batch}>
       {layoutWalls(house).map((seg) => {
         const top = wallTop(seg, mode, house.wallHeight, cam)
         return seg.openings.map((op) => <OpeningMesh key={op.o.id} seg={seg} op={op} top={top} />)
       })}
-    </group>
+    </StaticBatch>
   )
 }
 
@@ -160,7 +163,7 @@ function GarageDoor({ id, w, head, t, out, top }: P) {
   return (
     <group>
       {Array.from({ length: SECTIONS }, (_, i) => (
-        <group key={i} ref={(g) => { sections.current[i] = g }}>
+        <group key={i} ref={(g) => { sections.current[i] = g }} userData={{ dynamic: true }}>
           <mesh material={m.garageDoor} castShadow receiveShadow><boxGeometry args={[w, sh - 0.006, 0.045]} /></mesh>
           <mesh material={m.frame} position={[0, -sh / 2 + 0.004, out * 0.024]}><boxGeometry args={[w - 0.02, 0.01, 0.006]} /></mesh>
         </group>
@@ -277,7 +280,7 @@ function HingedLeaf({ id, hinge, side, width, swing, children }: {
   const target = side === 1 ? -swing * (Math.PI / 2) : swing * (Math.PI / 2)
   useFrame((_, dt) => { if (g.current) g.current.rotation.y = target * step(dt) })
   return (
-    <group ref={g} position={hinge}>
+    <group ref={g} position={hinge} userData={{ dynamic: true }}>
       <group position={[(side * width) / 2, 0, 0]} {...doorClickProps(id)}>{children}</group>
     </group>
   )
@@ -294,7 +297,7 @@ function SlidingDoor({ id, w, head, t }: P) {
   return (
     <group>
       <Casings w={w} head={head} t={t} />
-      <group ref={g}>
+      <group ref={g} userData={{ dynamic: true }}>
         <mesh material={m.whiteFrame} position={[0, leafH / 2, 0]} castShadow {...doorClickProps(id)}><boxGeometry args={[leafW, leafH, 0.035]} /></mesh>
         {[1, -1].map((sd) => (
           <mesh key={sd} material={handleMat} position={[leafW / 2 - 0.07, Math.min(1.05, leafH - 0.1), sd * 0.0178]} rotation={[Math.PI / 2, 0, 0]}>

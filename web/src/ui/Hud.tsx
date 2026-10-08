@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { currentSimSeconds, jumpToTimeOfDay, setAgentActive, setAvatarStyle, setPaused, setTimeScale, useStore, type AvatarStyle } from '../store'
+import { currentSimSeconds, jumpToTimeOfDay, requestProfile, setAdaptive, setAgentActive, setAvatarStyle, setPaused, setQuality, setTimeScale, useStore, type AvatarStyle } from '../store'
+import { MAX_LEVEL, QUALITY } from '../three/quality'
 import { SUNRISE_JUMP, SUNSET_JUMP } from '../three/sun'
 import { resetView, rotateView } from '../three/camera'
 import type { VectorRec, WallMode } from '../types'
@@ -66,6 +67,7 @@ export function Hud() {
             <SunIcon rising={false} /> Solnedgang
           </button>
         </div>
+        <QualityPanel />
       </div>
 
       <div className="panel top-right">
@@ -129,6 +131,35 @@ export function Hud() {
 
       {hovered && <div className="hover-room">{hovered.name}</div>}
     </>
+  )
+}
+
+/** Slider fra ydelse til kvalitet + adaptiv tilstand. Niveauet sættes automatisk ved første opstart. */
+function QualityPanel() {
+  const level = useStore((s) => s.quality)
+  const adaptive = useStore((s) => s.adaptive)
+  const profiling = useStore((s) => s.profiling)
+  const perf = useStore((s) => s.perf)
+  return (
+    <div className="quality">
+      <div className="label">Grafik</div>
+      <div className="quality-slider">
+        <span>Ydelse</span>
+        <input type="range" min={0} max={MAX_LEVEL} step={1} value={level} aria-label="Grafikkvalitet"
+          onChange={(e) => setQuality(Number(e.target.value))} />
+        <span>Kvalitet</span>
+      </div>
+      <div className="quality-status muted">
+        <b>{QUALITY[level].name}</b> · {perf.fps} fps
+        {profiling ? ' · måler hardware…' : perf.reduced ? ` · i bevægelse ${Math.round(perf.scale * 100)} %` : ''}
+      </div>
+      <div className="row quality-row">
+        <label className="check" title="Sænker opløsning, AO og skyggeopdatering mens kameraet bevæger sig, så det holder ~30 fps. Står kameraet stille, tegnes alt i fuld kvalitet.">
+          <input type="checkbox" checked={adaptive} onChange={(e) => setAdaptive(e.target.checked)} /> Adaptiv ydelse
+        </label>
+        <button onClick={requestProfile} disabled={profiling} title="Mål hardwaren igen og vælg niveau automatisk">Mål igen</button>
+      </div>
+    </div>
   )
 }
 
