@@ -94,7 +94,7 @@
     {"id": "billede-entre", "name": "Lille familiebillede (entré)", "room": "entre", "kind": "wallPicture", "pos": [20.28, 1.62], "y": 1.72, "rot": -90, "w": 0.24, "height": 0.32, "count": 4},
     {"id": "knax-entre", "name": "KNAX knagerække (sort/grå, under billedet)", "room": "entre", "kind": "knax", "pos": [20.28, 1.62], "y": 1.38, "rot": -90, "w": 0.38, "count": 4},
     {"id": "skoreol-entre", "name": "Skoreol (hvid, i nichen)", "room": "entre", "kind": "shoeRack", "pos": [20.13, 1.95], "rot": -90, "w": 0.9, "height": 0.315, "d": 0.29},
-    {"id": "reol-garage", "name": "Reol (garage)", "room": "garage", "kind": "model", "model": "steel_frame_shelves_01", "pos": [7.35, 6.5], "rot": -90, "height": 1.9},
+    {"id": "garderobe-garage", "name": "Hvidt garderobeskab (magen til Max-Emils)", "room": "garage", "kind": "wardrobe", "pos": [7.35, 6.5], "rot": -90, "w": 1.1},
     {"id": "havemoebler-terrasse", "name": "Havestole (2 stk, ved det runde bord)", "room": "ude", "kind": "model", "model": "outdoor_table_chair_set_01", "pos": [13.82, 12.1], "y": -0.06, "rot": 90, "hide": ["_table"]},
     {"id": "rundt-havebord", "name": "Rundt havebord (teak)", "room": "ude", "kind": "roundTable", "pos": [13.82, 12.1], "y": -0.06, "w": 0.7},
     {"id": "gasgrill", "name": "Stor gasgrill (op ad soveværelsets ydervæg)", "room": "ude", "kind": "gasGrill", "pos": [19.57, 18.8], "y": -0.055, "rot": -90, "w": 1.45},
