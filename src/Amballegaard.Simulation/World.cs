@@ -134,7 +134,34 @@ public sealed class World
         agent.RoomId = room?.Id ?? "";
         agent.WanderRoomId = room?.Id;
         agent.WanderAnchor = room is null ? to : null;
+
+        // Trækker man Stephan eller Lisa ind til den anden, reagerer den der allerede var der med et kys.
+        if (room is not null && id is "stephan" or "lisa")
+        {
+            var other = _agents.FirstOrDefault(a => a.Id == (id == "stephan" ? "lisa" : "stephan"));
+            if (other is not null && other.Active && other.RoomId == room.Id)
+                StartArrivalKiss(arriving: agent, resident: other);
+        }
         return true;
+    }
+
+    /// <summary>Den der allerede stod i rummet byder den anden velkommen med et kys, når den bliver trukket derhen.
+    /// Går direkte i Together-fasen (ingen gang-hen-til-hinanden, de står jo allerede tæt efter trækket).</summary>
+    private void StartArrivalKiss(Agent arriving, Agent resident)
+    {
+        resident.InLoveMeeting = true;
+        arriving.InLoveMeeting = true;
+        var toArriving = arriving.Position - resident.Position;
+        if (toArriving.Length > 0.01)
+        {
+            resident.Heading = Math.Atan2(toArriving.X, toArriving.Z);
+            arriving.Heading = Math.Atan2(-toArriving.X, -toArriving.Z);
+        }
+        var text = Speech.ArrivalKissLines[_rng.Next(Speech.ArrivalKissLines.Count)];
+        _loveScript = new LoveScript([new LoveLine(resident.Id, text)], EndsWithKiss: true);
+        _loveLineIndex = 0;
+        _loveTogetherTimer = 0;
+        _lovePhase = LovePhase.Together;
     }
 
     /// <summary>Slå en beboer til/fra. Fra = forsvinder og står stille; til = fortsætter hvor den var.</summary>

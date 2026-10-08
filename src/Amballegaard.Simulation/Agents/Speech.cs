@@ -130,6 +130,19 @@ public static class Speech
     }
 
     public static LoveScript RandomLoveScript(Random rng) => LoveScripts.All[rng.Next(LoveScripts.All.Count)];
+
+    /// <summary>Den der allerede står i rummet siger en af disse, når Stephan eller Lisa bliver trukket
+    /// hen til den anden (se World.MoveAgent). Alle ender med et kys.</summary>
+    public static readonly IReadOnlyList<string> ArrivalKissLines =
+    [
+        "Uhhh der kom min kysti - dejligt",
+        "Så fik man lige en kysti, skønt",
+        "Nææh en kysti kom flyvende - lækkert",
+        "En kysti! Haps haps",
+        "Godag bedufti!",
+        "Der kom lige en bedufti som ska ha et kys!",
+        "Det koster et kys at komme flyvende",
+    ];
 }
 
 /// <summary>En replik i et kærligheds-øjeblik. Speaker er "stephan", "lisa" eller "both" (begge siger den samtidig).</summary>
@@ -154,5 +167,6 @@ public static class LoveScripts
         new([S("Du bliver smukkere for hver dag."), L("Charmør!")], EndsWithKiss: false),
         new([S("Må jeg stjæle et kys?"), L("Kun hvis det bliver mere end ét.")], EndsWithKiss: true),
         new([L("Duftiii"), S("Bedufti"), L("Strudsekys!"), S("Uftii!")], EndsWithKiss: false),
+        new([S("Du skal lige ha et kys!"), L("Det kan jeg ikke tage imod - du får det lige tilbage")], EndsWithKiss: true),
     ];
 }
