@@ -769,7 +769,9 @@ function KitchenIsland({ id }: { id?: string }) {
 
   const sinkX = -0.26, sinkZ = -0.4
   const sinkW = 0.42, sinkD = 0.34, sinkDepth = 0.16
-  const sinkTopY = 0.92
+  // 3 mm over bordpladens overflade (0.92), så vaskens rand ikke flader sammen med
+  // bordpladens topflade (samme y gav kraftig z-fighting på overlappet mellem dem)
+  const sinkTopY = 0.923
   const sinkGeo = useMemo(() => {
     const outer = roundedRectShape(sinkW, sinkD, 0.025)
     outer.holes.push(roundedRectShape(sinkW - 0.07, sinkD - 0.07, 0.015) as unknown as THREE.Path)
@@ -787,6 +789,10 @@ function KitchenIsland({ id }: { id?: string }) {
   // i stedet for skjult under en massiv plade (samme hul-teknik som badekarret, blot som enkle kasser).
   const holeX0 = sinkX - (sinkW - 0.04) / 2, holeX1 = sinkX + (sinkW - 0.04) / 2
   const holeZ0 = sinkZ - (sinkD - 0.04) / 2, holeZ1 = sinkZ + (sinkD - 0.04) / 2
+  // Blandingsbatteriet skal stå på den faste bordplade bag hullet, ikke nede i vasken selv
+  const faucetX = holeX1 + 0.07
+  const spoutLen = faucetX - sinkX
+  const spoutX = (faucetX + sinkX) / 2
   const topX0 = 0.08 - 1.25 / 2, topX1 = 0.08 + 1.25 / 2
   const topZ0 = -1.15, topZ1 = 1.15
 
@@ -816,10 +822,11 @@ function KitchenIsland({ id }: { id?: string }) {
         </group>
       )}
 
-      {/* Høj blandingsbatteri: klik tænder/slukker vandet. Tuden rækker fra stangen ind over vaskens midte. */}
+      {/* Høj blandingsbatteri: står på bordpladen bag vasken (ikke nede i hullet), tuden rækker frem
+          over vaskens midte. Klik tænder/slukker vandet. */}
       <Clickable onActivate={() => waterId && toggleDoor(waterId)} enabled={!!waterId}>
-        <mesh material={f.steel} position={[sinkX + 0.1, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
-        <mesh material={f.steel} position={[sinkX + 0.0125, 1.24, sinkZ]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.013, 0.013, 0.175, 8]} /></mesh>
+        <mesh material={f.steel} position={[faucetX, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
+        <mesh material={f.steel} position={[spoutX, 1.24, sinkZ]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.013, 0.013, spoutLen, 8]} /></mesh>
       </Clickable>
 
       {/* Opvaskemaskine: indbygget i venstre (nordlige) ende, hængslet forneden — klik vipper lågen ned og ud */}
