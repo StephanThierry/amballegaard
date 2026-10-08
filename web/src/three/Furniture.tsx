@@ -917,10 +917,36 @@ function KitchenIsland({ id }: { id?: string }) {
   const topZ0 = -1.15, topZ1 = 1.15
 
   const dishZ = -0.78, dishW = 0.56, dishH = 0.72
+  // Hul i øens korpus så opvaskeren reelt har et rum bag lågen, i stedet for at lågen bare sidder på massivt træ.
+  const dishDepth = 0.5
+  const dishBackX = -0.5 + dishDepth
+  const dishZ0 = dishZ - dishW / 2, dishZ1 = dishZ + dishW / 2
+  const dishMats = useMemo(() => ({
+    plate: new THREE.MeshStandardMaterial({ color: '#f5f5f2', roughness: 0.25 }),
+    rack: new THREE.MeshStandardMaterial({ color: '#9a9ea1', roughness: 0.4, metalness: 0.5 }),
+    mug: ['#c0392b', '#2f6db0', '#e8c23c', '#ffffff'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.3 })),
+  }), [])
 
   return (
     <group>
-      <Box p={[0, 0.44, 0]} s={[1.0, 0.88, 2.2]} m={f.white} />
+      {/* Øens korpus, bygget som fire klodser omkring opvaskerens hulrum (syd, nord, bagvæg, loft over) */}
+      <Box p={[0, 0.44, (-1.1 + dishZ0) / 2]} s={[1.0, 0.88, dishZ0 + 1.1]} m={f.white} />
+      <Box p={[0, 0.44, (dishZ1 + 1.1) / 2]} s={[1.0, 0.88, 1.1 - dishZ1]} m={f.white} />
+      <Box p={[(dishBackX + 0.5) / 2, 0.44, dishZ]} s={[0.5 - dishBackX, 0.88, dishW]} m={f.white} />
+      <Box p={[(-0.5 + dishBackX) / 2, (dishH + 0.88) / 2, dishZ]} s={[dishDepth, 0.88 - dishH, dishW]} m={f.white} />
+      {/* Opvaskerens indhold: nederste kurv med tallerkner, øverste kurv med kopper */}
+      <Box p={[-0.25, 0.15, dishZ]} s={[dishDepth - 0.1, 0.02, dishW - 0.1]} m={dishMats.rack} shadow={false} />
+      {Array.from({ length: 5 }, (_, i) => (
+        <mesh key={`plate${i}`} material={dishMats.plate} position={[-0.25, 0.24, dishZ0 + 0.08 + i * ((dishZ1 - dishZ0 - 0.16) / 4)]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.09, 0.09, 0.012, 20]} />
+        </mesh>
+      ))}
+      <Box p={[-0.25, 0.45, dishZ]} s={[dishDepth - 0.1, 0.02, dishW - 0.1]} m={dishMats.rack} shadow={false} />
+      {Array.from({ length: 4 }, (_, i) => (
+        <mesh key={`mug${i}`} material={dishMats.mug[i % dishMats.mug.length]} position={[-0.25, 0.495, dishZ0 + 0.1 + i * ((dishZ1 - dishZ0 - 0.2) / 3)]} castShadow>
+          <cylinderGeometry args={[0.035, 0.032, 0.09, 14]} />
+        </mesh>
+      ))}
       {/* Bordplade som ramme om vaskehullet (syd, nord, vest, øst) */}
       <Box p={[0.08, 0.9, (holeZ1 + topZ1) / 2]} s={[1.25, 0.04, topZ1 - holeZ1]} m={f.stone} />
       <Box p={[0.08, 0.9, (topZ0 + holeZ0) / 2]} s={[1.25, 0.04, holeZ0 - topZ0]} m={f.stone} />
@@ -953,8 +979,8 @@ function KitchenIsland({ id }: { id?: string }) {
       <group position={[-0.501, 0, dishZ]}>
         <group ref={dishDoor} position={[0, 0.04, 0]} userData={{ dynamic: true }}>
           <group {...(dishId ? toggleProps(dishId) : {})}>
-            <Box p={[0, dishH / 2, 0]} s={[0.022, dishH, dishW]} m={f.blackSteel} />
-            <Box p={[0.012, dishH - 0.07, 0]} s={[0.004, 0.018, dishW - 0.1]} m={f.steel} shadow={false} />
+            <Box p={[0, dishH / 2, 0]} s={[0.022, dishH, dishW]} m={f.white} />
+            <Box p={[-0.012, dishH - 0.07, 0]} s={[0.004, 0.018, dishW - 0.1]} m={f.steel} shadow={false} />
           </group>
         </group>
       </group>
