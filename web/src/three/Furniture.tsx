@@ -729,11 +729,11 @@ function KitchenRun({ length, id }: { length: number; id?: string }) {
         ))}
         {/* Rød diode: lyser så længe komfuret er tændt */}
         <mesh material={diode} position={[cx - 0.26, 0.924, cz + 0.22]}><boxGeometry args={[0.02, 0.004, 0.012]} /></mesh>
-        {/* Gryde med vand på den bageste højre zone */}
-        <group position={[cx + potOffset[0], 0.924, cz + potOffset[1]]}>
-          <mesh material={f.kettle} castShadow><cylinderGeometry args={[0.09, 0.085, 0.11, 24]} /></mesh>
-          <mesh material={waterMat} position={[0, 0.05, 0]}><cylinderGeometry args={[0.078, 0.078, 0.01, 24]} /></mesh>
-          <mesh material={f.steel} position={[0.1, 0.03, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.006, 0.006, 0.05, 8]} /></mesh>
+        {/* Gryde med vand på den bageste højre zone — står OVENPÅ bordpladen (0.92), ikke sænket ned i den */}
+        <group position={[cx + potOffset[0], 0.92, cz + potOffset[1]]}>
+          <mesh material={f.kettle} position={[0, 0.055, 0]} castShadow><cylinderGeometry args={[0.09, 0.085, 0.11, 24]} /></mesh>
+          <mesh material={waterMat} position={[0, 0.098, 0]}><cylinderGeometry args={[0.078, 0.078, 0.01, 24]} /></mesh>
+          <mesh material={f.steel} position={[0.1, 0.07, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.006, 0.006, 0.05, 8]} /></mesh>
         </group>
       </Clickable>
       <instancedMesh ref={steam} args={[steamGeometry, steamMaterial, STEAM_COUNT]} frustumCulled={false} />
