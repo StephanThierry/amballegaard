@@ -236,8 +236,8 @@ function GameScreen({ kind, w, h, position }: { kind: string; w: number; h: numb
   return <mesh material={mat} position={position}><planeGeometry args={[w, h]} /></mesh>
 }
 
-function Desk({ p, rot = 0, w = 1.2, game, chairColor, screenRot = 0 }: {
-  p: V3; rot?: number; w?: number; game?: string; chairColor?: string; screenRot?: number
+function Desk({ p, rot = 0, w = 1.2, game, chairColor, screenRot = 0, noScreen = false }: {
+  p: V3; rot?: number; w?: number; game?: string; chairColor?: string; screenRot?: number; noScreen?: boolean
 }) {
   const f = fm()
   return (
@@ -246,14 +246,99 @@ function Desk({ p, rot = 0, w = 1.2, game, chairColor, screenRot = 0 }: {
       {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
         <Box key={`${x}${z}`} p={[x * (w / 2 - 0.04), 0.36, z * 0.26]} s={[0.03, 0.72, 0.03]} m={f.blackSteel} />
       ))}
-      {/* Skærmen drejes om sin egen fod, så to skærme på samme bord kan vinkles ind mod brugeren uden at overlappe. */}
-      <At p={[0.2, 0, -0.15]} rot={screenRot}>
-        <Box p={[0, 0.95, 0]} s={[0.5, 0.32, 0.02]} m={f.screen} />
-        {game && <GameScreen kind={game} w={0.48} h={0.3} position={[0, 0.95, 0.0105]} />}
-        <Box p={[0, 0.78, 0]} s={[0.04, 0.12, 0.04]} m={f.blackSteel} />
-      </At>
+      {noScreen ? (
+        <>
+          <group position={[-0.15, 0.73, -0.12]}><ToddlerToys /></group>
+          <group position={[0.3, 0.73, 0.12]} rotation={[0, 0.4, 0]}><StageMic /></group>
+        </>
+      ) : (
+        /* Skærmen drejes om sin egen fod, så to skærme på samme bord kan vinkles ind mod brugeren uden at overlappe. */
+        <At p={[0.2, 0, -0.15]} rot={screenRot}>
+          <Box p={[0, 0.95, 0]} s={[0.5, 0.32, 0.02]} m={f.screen} />
+          {game && <GameScreen kind={game} w={0.48} h={0.3} position={[0, 0.95, 0.0105]} />}
+          <Box p={[0, 0.78, 0]} s={[0.04, 0.12, 0.04]} m={f.blackSteel} />
+        </At>
+      )}
       <OfficeChair p={[0, 0, 0.55]} rot={Math.PI} color={chairColor} />
     </At>
+  )
+}
+
+/** Småbørns-legetøj: ringstabletårn, et par klodser og to bamser. Lokalt: ligger fladt på et bord. */
+function ToddlerToys() {
+  const f = fm()
+  const ringMats = useMemo(() => ['#e74c3c', '#f1c40f', '#2ecc71', '#3498db'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 })), [])
+  const blockMats = useMemo(() => ['#f39c12', '#9b59b6', '#1abc9c'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 })), [])
+  return (
+    <group>
+      {/* Ringstabletårn */}
+      <group position={[-0.08, 0, -0.03]}>
+        <mesh material={f.oak}><cylinderGeometry args={[0.01, 0.01, 0.15, 10]} /></mesh>
+        {ringMats.map((m, i) => (
+          <mesh key={i} material={m} position={[0, 0.02 + i * 0.032, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <torusGeometry args={[0.042 - i * 0.006, 0.015, 10, 20]} />
+          </mesh>
+        ))}
+      </group>
+      {/* Klodser */}
+      {[[0.08, 0.1, 0], [0.13, 0.085, 0.6], [0.1, 0.12, 1.2]].map(([x, z, rotY], i) => (
+        <mesh key={i} material={blockMats[i]} position={[x, 0.022, z]} rotation={[0, rotY, 0]} castShadow>
+          <boxGeometry args={[0.045, 0.045, 0.045]} />
+        </mesh>
+      ))}
+      {/* Bamser */}
+      <group position={[-0.05, 0, 0.11]} scale={1.1}><Plush kind={0} color="#d9b48a" accent="#ffffff" /></group>
+      <group position={[0.17, 0, -0.08]} rotation={[0, 1.4, 0]} scale={0.9}><Plush kind={1} color="#f2e6d8" accent="#ff8fa3" /></group>
+    </group>
+  )
+}
+
+/** Håndholdt scenemikrofon, liggende på siden. Lokalt: lægges fladt, ingen fast retning. */
+function StageMic() {
+  const f = fm()
+  const grille = useMemo(() => new THREE.MeshStandardMaterial({ color: '#8c8f92', roughness: 0.5, metalness: 0.6 }), [])
+  return (
+    <group rotation={[0, 0, Math.PI / 2]}>
+      <mesh material={f.blackSteel} position={[0, 0.07, 0]} castShadow><cylinderGeometry args={[0.016, 0.019, 0.1, 16]} /></mesh>
+      <mesh material={grille} position={[0, 0.13, 0]} castShadow><sphereGeometry args={[0.021, 14, 12]} /></mesh>
+      <mesh material={f.blackSteel} position={[0, 0, 0]}><cylinderGeometry args={[0.012, 0.016, 0.03, 12]} /></mesh>
+    </group>
+  )
+}
+
+/** Stort sort Yamaha-lignende scenekeyboard på X-stativ. Lokalt: front (tangenter) mod +z. */
+function Keyboard() {
+  const f = fm()
+  const body = useMemo(() => new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.35 }), [])
+  const whiteKey = useMemo(() => new THREE.MeshStandardMaterial({ color: '#f2f0ea', roughness: 0.4 }), [])
+  const blackKey = useMemo(() => new THREE.MeshStandardMaterial({ color: '#0a0a0a', roughness: 0.3 }), [])
+  const panel = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1c1c1e', roughness: 0.4, emissive: '#2a5fd0', emissiveIntensity: 0.12 }), [])
+  const W = 1.3, D = 0.32, H = 0.09, standH = 0.72
+  const nWhite = 44
+  const kw = (W - 0.06) / nWhite
+  // Sort tangent efter de hvide i et oktav-mønster (C D E F G A B → sort efter C D F G A)
+  const blackAfter = [1, 1, 0, 1, 1, 1, 0]
+  return (
+    <group position={[0, standH, 0]}>
+      <RoundedBox args={[W, H, D]} radius={0.015} smoothness={2} position={[0, H / 2, -D * 0.15]} material={body} castShadow receiveShadow />
+      <Box p={[0, H + 0.005, -D * 0.32]} s={[W - 0.1, 0.01, D * 0.22]} m={panel} shadow={false} />
+      <group position={[-W / 2 + kw / 2 + 0.03, H + 0.005, D * 0.22]}>
+        {Array.from({ length: nWhite }, (_, i) => (
+          <Box key={i} p={[kw * i, 0, 0]} s={[kw - 0.002, 0.012, D * 0.5]} m={whiteKey} />
+        ))}
+        {Array.from({ length: nWhite }, (_, i) => {
+          if (!blackAfter[i % 7]) return null
+          return <Box key={`b${i}`} p={[kw * i + kw / 2, 0.008, -D * 0.1]} s={[kw * 0.55, 0.014, D * 0.3]} m={blackKey} />
+        })}
+      </group>
+      {/* X-stativ */}
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * W * 0.32, 0, 0]}>
+          <mesh material={f.blackSteel} position={[0, -standH / 2, 0]} rotation={[0, 0, s * 0.5]} castShadow><boxGeometry args={[0.03, standH, 0.03]} /></mesh>
+          <mesh material={f.blackSteel} position={[0, -standH / 2, 0]} rotation={[0, 0, -s * 0.5]} castShadow><boxGeometry args={[0.03, standH, 0.03]} /></mesh>
+        </group>
+      ))}
+    </group>
   )
 }
 
@@ -2567,6 +2652,8 @@ export interface FurnitureItem {
   applianceId?: string
   /** Skrivebord: drejer den indbyggede skærm om sin egen fod (grader), så to skærme kan vinkles ind mod brugeren. */
   screenRot?: number
+  /** Skrivebord: udelader den indbyggede skærm (og tegner i stedet legetøj og en mikrofon). */
+  noScreen?: boolean
 }
 
 export const furnitureItems = (furnitureData as unknown as { items: FurnitureItem[] }).items
@@ -2586,7 +2673,8 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'roundTable': return <RoundTable d={it.w} color={it.color} />
     case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} squarePillows={it.squarePillows} />
     case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} />
-    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} screenRot={((it.screenRot ?? 0) * Math.PI) / 180} />
+    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} screenRot={((it.screenRot ?? 0) * Math.PI) / 180} noScreen={it.noScreen} />
+    case 'keyboard': return <Keyboard />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
     case 'toilet': return <Toilet id={it.id} />
