@@ -2448,10 +2448,14 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
   const seatD = d - 0.2
   const seatZ = 0.08
   const extHalf = (d - 0.1) / 2
+  // Udtræksdelens egen boks er placeret extHalf foran gruppens origo (se position=[0,0.44,extHalf]
+  // nedenfor), så gruppens z skal forskydes med -extHalf for at ramme den tilsigtede verdens-z.
   // Lukket: centreret om siddehynden, så den kun stikker lidt (og lige meget) ud til begge sider — ikke
   // synligt bagtil som en separat, lavere del.
-  const extClosedZ = seatZ
-  const extOpenZ = seatZ + seatD / 2 + extHalf
+  const extClosedZ = seatZ - extHalf
+  // Åben: udtræksdelens bagkant flugter præcis med sædets forkant, så liggefladen er sammenhængende
+  // uden hul.
+  const extOpenZ = seatZ + seatD / 2
   useFrame((_, dt) => {
     const t = step(dt)
     openT.current = t
