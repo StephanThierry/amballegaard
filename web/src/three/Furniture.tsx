@@ -889,11 +889,17 @@ function WasherDryerUnit({ x, dryer, id, W, D, base, H }: {
       <Box p={[0.08, base + H - 0.06, D / 2 + 0.005]} s={[0.16, 0.04, 0.004]} m={f.screen} shadow={false} />
       {/* Fast ramme rundt om lugehullet, så man ser den mørke åbning bag den hængslede låge */}
       <mesh material={f.blackSteel} position={[0, base + H * 0.42, D / 2 + 0.004]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.165, 0.165, 0.01, 32]} /></mesh>
-      {/* Rund luge: hængslet i yderkanten, klik åbner/lukker den */}
+      {/* Rund luge: hængslet i yderkanten, klik åbner/lukker den. Vaskemaskinens låge er hvid med en dyb
+          grove forneden som håndtag; tørretumblerens beholder den stålgrå ramme. */}
       <group ref={door} position={[hinge * R, base + H * 0.42, D / 2 + 0.006]} userData={{ dynamic: true }}>
         <group {...(id ? toggleProps(id) : {})}>
-          <mesh material={f.steel} position={[hinge * -R, 0, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
+          <mesh material={dryer ? f.steel : f.white} position={[hinge * -R, 0, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
           <mesh material={dryer ? f.screen : f.blackGlass} position={[hinge * -R, 0, 0.007]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.155, 0.155, 0.006, 32]} /></mesh>
+          {!dryer && (
+            <mesh material={f.blackSteel} position={[hinge * -R, -0.15, 0.007]} rotation={[0, 0, Math.PI / 2]}>
+              <capsuleGeometry args={[0.009, 0.05, 6, 10]} />
+            </mesh>
+          )}
         </group>
       </group>
     </group>
