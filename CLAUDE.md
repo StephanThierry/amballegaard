@@ -30,4 +30,17 @@ Sådan tolkes den (aftalt med brugeren 2026-10-07):
 - Meter, x mod højre og z nedad på plantegningen, y op. Origo = garagens vestvæg / nordligste facade.
 - Simulationen er server-autoritativ (`src/Amballegaard.Simulation`); klienten tegner kun.
 - `dotnet test` dækker husmodel, drag/drop, talebobler og porte. Kør den efter ændringer i data/house.json.
+- **Ændrer du `data/house.json`, skal backenden genstartes.** Husmodellen indlæses som singleton ved opstart,
+  mens `/api/house` sender filen rå — så en ny åbning eller hvidevare ser rigtig ud i browseren, mens
+  simulationen ikke kender den, og `ToggleDoor` fejler tavst. `data/furniture.json` hot-reloades derimod.
 - Serveren bygges uden apphost (`UseAppHost=false`), fordi Windows blokerer den nybyggede exe.
+
+## Før du rører 3D-klienten
+
+Læs **`docs/3d-noter.md`** før ændringer i `web/src/three`. Den har filkortet og de ting der ellers
+koster tid at udlede igen: den fælles klik-mekanisme (`interact.tsx` — ingen knapper, man klikker på
+objektet), afskæringen af vægåbninger i lave vægge (`clip.tsx` — ægte tværsnit, aldrig skalering),
+orienteringen i en vægåbning (`out`, lokal +z, `swing`) som afgør hvilken vej en dør åbner og hvad
+der er inder- og yderside, og tv-showene (`show.ts` + `TvShow.tsx`). Desuden kommandoer til
+typecheck/lint, de faldgruber der koster mest tid (forældede Vite-moduler, house.json-genstarten),
+og opskriften på at stille kameraet præcist via `window.__cc` når en ændring skal ses i browseren.

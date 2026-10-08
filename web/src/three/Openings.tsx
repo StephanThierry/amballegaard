@@ -1,10 +1,11 @@
 import { useFrame } from '@react-three/fiber'
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { toggleDoor, useStore } from '../store'
 import type { House, P2, WallMode } from '../types'
+import { ClipBelow, useClip } from './clip'
+import { Clickable, toggleProps } from './interact'
 import { layoutWalls, wallTop, type PlacedOpening, type WallSegment } from './layout'
-import { getMaterials } from './materials'
 import { QUALITY } from './quality'
 import { StaticBatch } from './StaticBatch'
 
@@ -18,48 +19,54 @@ export function Openings({ house, mode, cam }: { house: House; mode: WallMode; c
     <StaticBatch enabled={batch}>
       {layoutWalls(house).map((seg) => {
         const top = wallTop(seg, mode, house.wallHeight, cam)
-        return seg.openings.map((op) => <OpeningMesh key={op.o.id} seg={seg} op={op} top={top} />)
+        return seg.openings.map((op) => <OpeningMesh key={op.o.id} seg={seg} op={op} top={top} full={house.wallHeight} />)
       })}
     </StaticBatch>
   )
 }
 
-function OpeningMesh({ seg, op, top }: { seg: WallSegment; op: PlacedOpening; top: number }) {
+/**
+ * Åbningens indhold bygges altid i sin rigtige størrelse — også når væggen er skåret ned. Er væggen lav,
+ * klippes indholdet vandret i væghøjden med `<ClipBelow>`, så fx en glasdør og en garageport ser ens ud i
+ * alle visningstilstande og blot er savet over i snitfladen.
+ */
+function OpeningMesh({ seg, op, top, full }: { seg: WallSegment; op: PlacedOpening; top: number; full: number }) {
   const x = seg.a[0] + seg.dir[0] * op.s
   const z = seg.a[1] + seg.dir[1] * op.s
   const rotY = Math.atan2(-seg.dir[1], seg.dir[0])
   const out = seg.outward // lokal +z peger ud for ydervægge når out = 1
-  const head = Math.min(op.head, top)
-  if (head <= op.sill + 0.02) return null
+  if (top <= op.sill + 0.02) return null // hele åbningen ligger over snitfladen
   // Karme/rammer rykkes GAP ind fra murens lysning, så deres flader aldrig ligger i samme plan som muren (z-fighting).
   const props = {
-    id: op.o.id, w: op.o.width - 2 * GAP, sill: op.sill + GAP, head: head - GAP, clipped: head < op.head,
-    t: seg.thickness, out, leaves: op.o.leaves ?? 1, top,
+    id: op.o.id, w: op.o.width - 2 * GAP, sill: op.sill + GAP, head: op.head - GAP,
+    t: seg.thickness, out, leaves: op.o.leaves ?? 1,
   }
 
   return (
     <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
-      {(() => {
-        switch (op.o.type) {
-          case 'window': return <GlazedUnit {...props} isDoor={false} />
-          case 'glassDoor':
-          case 'exteriorDoor': return <GlazedDoor {...props} />
-          case 'slidingDoor': return <SlidingDoor {...props} />
-          case 'frontDoor': return <FrontDoor {...props} />
-          case 'garageDoor': return <GarageDoor {...props} />
-          case 'fireplace': return <Fireplace {...props} />
-          case 'frenchDoor': return <InteriorDoor {...props} glazed />
-          default: return <InteriorDoor {...props} />
-        }
-      })()}
+      <ClipBelow y={top >= full ? Infinity : top}>
+        {(() => {
+          switch (op.o.type) {
+            case 'window': return <GlazedUnit {...props} isDoor={false} />
+            case 'glassDoor':
+            case 'exteriorDoor': return <GlazedDoor {...props} />
+            case 'slidingDoor': return <SlidingDoor {...props} />
+            case 'frontDoor': return <FrontDoor {...props} />
+            case 'garageDoor': return <GarageDoor {...props} />
+            case 'fireplace': return <Fireplace {...props} />
+            case 'frenchDoor': return <InteriorDoor {...props} glazed />
+            default: return <InteriorDoor {...props} />
+          }
+        })()}
+      </ClipBelow>
     </group>
   )
 }
 
-type P = { id: string; top: number; w: number; sill: number; head: number; clipped: boolean; t: number; out: 1 | -1; leaves: number }
+type P = { id: string; w: number; sill: number; head: number; t: number; out: 1 | -1; leaves: number }
 
-function GlazedUnit({ w, sill, head, clipped, t, out, leaves, isDoor }: P & { isDoor: boolean }) {
-  const m = getMaterials()
+function GlazedUnit({ w, sill, head, t, out, leaves, isDoor }: P & { isDoor: boolean }) {
+  const { m } = useClip()
   const zf = out * (t / 2 - 0.09)
   const h = head - sill
   const n = isDoor ? Math.max(leaves, 1) : w > 1.15 ? 2 : 1
@@ -71,7 +78,7 @@ function GlazedUnit({ w, sill, head, clipped, t, out, leaves, isDoor }: P & { is
       <mesh material={m.frame} position={[-w / 2 + F / 2, sill + h / 2, zf]} castShadow><boxGeometry args={[F, h, 0.08]} /></mesh>
       <mesh material={m.frame} position={[w / 2 - F / 2, sill + h / 2, zf]} castShadow><boxGeometry args={[F, h, 0.08]} /></mesh>
       <mesh material={m.frame} position={[0, sill + bottomF / 2, zf]} castShadow><boxGeometry args={[w, bottomF, 0.08]} /></mesh>
-      {!clipped && <mesh material={m.frame} position={[0, head - F / 2, zf]} castShadow><boxGeometry args={[w, F, 0.08]} /></mesh>}
+      <mesh material={m.frame} position={[0, head - F / 2, zf]} castShadow><boxGeometry args={[w, F, 0.08]} /></mesh>
       {mullions.map((mx) => (
         <mesh key={mx} material={m.frame} position={[mx, sill + h / 2, zf]} castShadow><boxGeometry args={[F * 1.4, h, 0.07]} /></mesh>
       ))}
@@ -90,8 +97,9 @@ function GlazedUnit({ w, sill, head, clipped, t, out, leaves, isDoor }: P & { is
   )
 }
 
-function FrontDoor({ id, w, head, clipped, t, out }: P) {
-  const m = getMaterials()
+/** Hoveddør. Som alle yderdøre åbner den ud (væk fra huset). */
+function FrontDoor({ id, w, head, t, out }: P) {
+  const { m } = useClip()
   const zf = out * (t / 2 - 0.09)
   const h = Math.min(head, 2.2)
   const leafW = w - 2 * F
@@ -99,8 +107,8 @@ function FrontDoor({ id, w, head, clipped, t, out }: P) {
     <group>
       <mesh material={m.frame} position={[-w / 2 + F / 2, head / 2, zf]}><boxGeometry args={[F, head, 0.09]} /></mesh>
       <mesh material={m.frame} position={[w / 2 - F / 2, head / 2, zf]}><boxGeometry args={[F, head, 0.09]} /></mesh>
-      {!clipped && <mesh material={m.frame} position={[0, head - F / 2, zf]}><boxGeometry args={[w, F, 0.09]} /></mesh>}
-      <HingedLeaf id={id} hinge={[-w / 2 + F, (h - F) / 2, zf]} side={1} width={leafW} swing={-out}>
+      <mesh material={m.frame} position={[0, head - F / 2, zf]}><boxGeometry args={[w, F, 0.09]} /></mesh>
+      <HingedLeaf id={id} hinge={[-w / 2 + F, (h - F) / 2, zf]} side={1} width={leafW} swing={out}>
         <mesh material={m.garageDoor} position={[0, 0, out * 0.012]} castShadow><boxGeometry args={[leafW, h - F, 0.04]} /></mesh>
         <mesh material={m.whiteFrame} position={[0, 0, -out * 0.017]}><boxGeometry args={[leafW, h - F, 0.02]} /></mesh>
         <LeverHandles x={leafW / 2 - 0.08} y={Math.min(1.05, h - F - 0.1) - (h - F) / 2} t={0.08} dir={-1} />
@@ -119,8 +127,8 @@ const TRACK_RADIUS = 0.35
  * Ledport (sektionsport): sektionerne kører op ad lodrette skinner, bøjer om i en kvart cirkel
  * og fortsætter vandret langs loftet ind i garagen. Åben/lukket styres af serveren.
  */
-function GarageDoor({ id, w, head, t, out, top }: P) {
-  const m = getMaterials()
+function GarageDoor({ id, w, head, t, out }: P) {
+  const { m } = useClip()
   const open = useStore((s) => s.snapshot?.openDoors.includes(id) ?? false)
   const sections = useRef<(THREE.Group | null)[]>([])
   const f = useRef(open ? 1 : 0)
@@ -161,10 +169,13 @@ function GarageDoor({ id, w, head, t, out, top }: P) {
   )
   const depth = head + 0.3
   return (
-    <group>
+    // Klik hvor som helst på porten (eller skinnerne) åbner/lukker den — der er ingen knap.
+    <Clickable onActivate={() => toggleDoor(id)}>
       {Array.from({ length: SECTIONS }, (_, i) => (
         <group key={i} ref={(g) => { sections.current[i] = g }} userData={{ dynamic: true }}>
           <mesh material={m.garageDoor} castShadow receiveShadow><boxGeometry args={[w, sh - 0.006, 0.045]} /></mesh>
+          {/* Indersiden er hvid — set fra garagen, og nedefra når porten ligger langs loftet */}
+          <mesh material={m.whiteFrame} position={[0, 0, -out * 0.0245]}><boxGeometry args={[w - 0.004, sh - 0.008, 0.004]} /></mesh>
           <mesh material={m.frame} position={[0, -sh / 2 + 0.004, out * 0.024]}><boxGeometry args={[w - 0.02, 0.01, 0.006]} /></mesh>
         </group>
       ))}
@@ -172,39 +183,12 @@ function GarageDoor({ id, w, head, t, out, top }: P) {
       {[-1, 1].map((side) => (
         <group key={side} position={[side * (w / 2 + 0.03), 0, zf + inward * 0.04]}>
           <mesh material={m.zinc} position={[0, head / 2, 0]}>{rail}</mesh>
-          {top > head + 0.3 && (
-            <mesh material={m.zinc} position={[0, head + r, inward * (r + depth / 2)]}><boxGeometry args={[0.04, 0.06, depth]} /></mesh>
-          )}
+          <mesh material={m.zinc} position={[0, head + r, inward * (r + depth / 2)]}><boxGeometry args={[0.04, 0.06, depth]} /></mesh>
         </group>
       ))}
       {/* Udvendig væglampe som på fotoene */}
-      {top > head + 0.3 && <mesh material={m.frame} position={[0, head + 0.35, out * (t / 2 + 0.04)]}><boxGeometry args={[0.08, 0.16, 0.08]} /></mesh>}
-      {/* Kun knap på indersiden */}
-      <DoorButton position={[w / 2 + 0.18, Math.min(1.2, top - 0.18), inward * (t / 2 + 0.012)]} facing={inward}
-        open={open} onPress={() => toggleDoor(id)} />
-    </group>
-  )
-}
-
-/** Trykknap på væggen. Grøn = tryk for at åbne, orange = tryk for at lukke. */
-function DoorButton({ position, facing, open, onPress }: {
-  position: [number, number, number]; facing: number; open: boolean; onPress: () => void
-}) {
-  const [hover, setHover] = useState(false)
-  const color = open ? '#ff9a3c' : '#43d17a'
-  return (
-    <group position={position} rotation={[0, facing > 0 ? 0 : Math.PI, 0]}
-      onClick={(e) => { e.stopPropagation(); onPress() }}
-      onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setHover(false); document.body.style.cursor = '' }}>
-      <mesh castShadow><boxGeometry args={[0.1, 0.15, 0.02]} /><meshStandardMaterial color="#2a2c30" roughness={0.4} metalness={0.4} /></mesh>
-      <mesh position={[0, 0, 0.014]} rotation={[Math.PI / 2, 0, 0]} scale={hover ? 1.25 : 1}>
-        <cylinderGeometry args={[0.03, 0.03, 0.014, 20]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={hover ? 2.4 : 1.4} toneMapped={false} />
-      </mesh>
-      {/* Usynlig, større klikflade så knappen er nem at ramme på afstand */}
-      <mesh position={[0, 0, 0.02]} visible={false}><boxGeometry args={[0.35, 0.4, 0.04]} /></mesh>
-    </group>
+      <mesh material={m.frame} position={[0, head + 0.35, out * (t / 2 + 0.04)]}><boxGeometry args={[0.08, 0.16, 0.08]} /></mesh>
+    </Clickable>
   )
 }
 
@@ -229,7 +213,7 @@ function InteriorDoor({ id, w, head, t, leaves, glazed = false }: P & { glazed?:
 
 /** Hvide gerigter på begge sider af en indvendig døråbning. */
 function Casings({ w, head, t, casing = 0.07 }: { w: number; head: number; t: number; casing?: number }) {
-  const m = getMaterials()
+  const { m } = useClip()
   return (
     <>
       {[1, -1].map((side) => (
@@ -255,19 +239,6 @@ function useDoorOpenness(id: string) {
   }
 }
 
-/** Klik åbner/lukker døren (ikke mens vektorværktøjet er aktivt). */
-function doorClickProps(id: string) {
-  return {
-    onClick: (e: { stopPropagation: () => void }) => {
-      if (useStore.getState().tool === 'vector') return
-      e.stopPropagation()
-      toggleDoor(id)
-    },
-    onPointerOver: (e: { stopPropagation: () => void }) => { e.stopPropagation(); document.body.style.cursor = 'pointer' },
-    onPointerOut: () => { document.body.style.cursor = '' },
-  }
-}
-
 /**
  * Dørblad hængslet i `hinge`. Lukket ligger bladet i vægplanet og strækker sig mod `side` (+1 = +x, -1 = -x);
  * åbent er det drejet 90° ud mod `swing` (+1 = lokal +z-side af væggen).
@@ -281,14 +252,14 @@ function HingedLeaf({ id, hinge, side, width, swing, children }: {
   useFrame((_, dt) => { if (g.current) g.current.rotation.y = target * step(dt) })
   return (
     <group ref={g} position={hinge} userData={{ dynamic: true }}>
-      <group position={[(side * width) / 2, 0, 0]} {...doorClickProps(id)}>{children}</group>
+      <group position={[(side * width) / 2, 0, 0]} {...toggleProps(id)}>{children}</group>
     </group>
   )
 }
 
 /** Skydedør der kører ind i væggen (lommedør) mod -x. */
 function SlidingDoor({ id, w, head, t }: P) {
-  const m = getMaterials()
+  const { m, clip } = useClip()
   const leafH = Math.min(2.03, head - 0.02)
   const leafW = w - 0.02
   const g = useRef<THREE.Group>(null)
@@ -298,9 +269,9 @@ function SlidingDoor({ id, w, head, t }: P) {
     <group>
       <Casings w={w} head={head} t={t} />
       <group ref={g} userData={{ dynamic: true }}>
-        <mesh material={m.whiteFrame} position={[0, leafH / 2, 0]} castShadow {...doorClickProps(id)}><boxGeometry args={[leafW, leafH, 0.035]} /></mesh>
+        <mesh material={m.whiteFrame} position={[0, leafH / 2, 0]} castShadow {...toggleProps(id)}><boxGeometry args={[leafW, leafH, 0.035]} /></mesh>
         {[1, -1].map((sd) => (
-          <mesh key={sd} material={handleMat} position={[leafW / 2 - 0.07, Math.min(1.05, leafH - 0.1), sd * 0.0178]} rotation={[Math.PI / 2, 0, 0]}>
+          <mesh key={sd} material={clip(handleMat)} position={[leafW / 2 - 0.07, Math.min(1.05, leafH - 0.1), sd * 0.0178]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[0.03, 0.03, 0.002, 24]} />
           </mesh>
         ))}
@@ -309,9 +280,12 @@ function SlidingDoor({ id, w, head, t }: P) {
   )
 }
 
-/** Glasdør i ydervæg (terrassedøre m.m.): fast karm + hængslede glasblade der åbner indad. */
-function GlazedDoor({ id, w, sill, head, clipped, t, out, leaves }: P) {
-  const m = getMaterials()
+/**
+ * Glasdør i ydervæg (terrasse- og havedøre m.m.): fast karm + hængslede glasblade.
+ * Yderdøre åbner altid ud mod haven, så de ikke tager plads i rummet (`swing = out`).
+ */
+function GlazedDoor({ id, w, sill, head, t, out, leaves }: P) {
+  const { m } = useClip()
   const zf = out * (t / 2 - 0.09)
   const h = head - sill
   const n = Math.max(leaves, 1)
@@ -320,11 +294,11 @@ function GlazedDoor({ id, w, sill, head, clipped, t, out, leaves }: P) {
     <group>
       <mesh material={m.frame} position={[-w / 2 + F / 2, sill + h / 2, zf]} castShadow><boxGeometry args={[F, h, 0.08]} /></mesh>
       <mesh material={m.frame} position={[w / 2 - F / 2, sill + h / 2, zf]} castShadow><boxGeometry args={[F, h, 0.08]} /></mesh>
-      {!clipped && <mesh material={m.frame} position={[0, head - F / 2, zf]} castShadow><boxGeometry args={[w, F, 0.08]} /></mesh>}
+      <mesh material={m.frame} position={[0, head - F / 2, zf]} castShadow><boxGeometry args={[w, F, 0.08]} /></mesh>
       {Array.from({ length: n }, (_, i) => (
-        <HingedLeaf key={i} id={id} hinge={[i === 0 ? -w / 2 + F : w / 2 - F, sill + h / 2, zf]} side={i === 0 ? 1 : -1} width={leafW} swing={-out}>
+        <HingedLeaf key={i} id={id} hinge={[i === 0 ? -w / 2 + F : w / 2 - F, sill + h / 2, zf]} side={i === 0 ? 1 : -1} width={leafW} swing={out}>
           <mesh material={m.frame} position={[0, -h / 2 + 0.05, 0]} castShadow><boxGeometry args={[leafW, 0.1, 0.06]} /></mesh>
-          {!clipped && <mesh material={m.frame} position={[0, h / 2 - F * 1.5, 0]} castShadow><boxGeometry args={[leafW, F, 0.06]} /></mesh>}
+          <mesh material={m.frame} position={[0, h / 2 - F * 1.5, 0]} castShadow><boxGeometry args={[leafW, F, 0.06]} /></mesh>
           {[-1, 1].map((sx) => <mesh key={sx} material={m.frame} position={[sx * (leafW / 2 - 0.025), 0, 0]} castShadow><boxGeometry args={[0.05, h - 0.02, 0.06]} /></mesh>)}
           <mesh material={m.glass}><boxGeometry args={[leafW - 0.06, h - 0.12, 0.012]} /></mesh>
           {h > 1.2 && <LeverHandles x={(i === 0 ? 1 : -1) * (leafW / 2 - 0.05)} y={1.05 - sill - h / 2} t={0.06} dir={i === 0 ? -1 : 1} />}
@@ -339,7 +313,7 @@ function GlazedDoor({ id, w, sill, head, clipped, t, out, leaves }: P) {
  * Lokalt: bladet ligger i yz-planet (tykkelse langs x), centreret i origo.
  */
 function GlazedLeaf({ h, w }: { h: number; w: number }) {
-  const m = getMaterials()
+  const { m } = useClip()
   const stile = 0.075, rail = 0.075, bottom = 0.16, th = 0.04
   const panes = 3
   const paneH = (h - rail - bottom - (panes - 1) * rail) / panes
@@ -392,18 +366,19 @@ function getFlameTexture() {
 
 /**
  * Gennemsigtig pejs indbygget i væggen: sort brændkammer med glas på begge sider, brænde og animerede
- * flammer. Tændt/slukket deles via serveren (samme mekanisme som garageportene) og styres med en vægkontakt.
+ * flammer. Tændt/slukket deles via serveren (samme mekanisme som garageportene) — klik på pejsen tænder/slukker.
  */
-function Fireplace({ id, w, sill, head, t, top }: P) {
+function Fireplace({ id, w, sill, head, t }: P) {
   const lit = useStore((s) => s.snapshot?.openDoors.includes(id) ?? false)
+  const { planes } = useClip()
   const h = head - sill
   const mats = useMemo(() => ({
-    steel: new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.7, metalness: 0.3 }),
-    log: new THREE.MeshStandardMaterial({ color: '#4a3020', roughness: 0.95 }),
-    ember: new THREE.MeshStandardMaterial({ color: '#2a1408', emissive: '#ff5a10', emissiveIntensity: 0, roughness: 1 }),
-    glass: new THREE.MeshPhysicalMaterial({ color: '#2b2f33', transparent: true, opacity: 0.18, roughness: 0.05, clearcoat: 1, depthWrite: false }),
-    flame: new THREE.SpriteMaterial({ map: getFlameTexture(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }),
-  }), [])
+    steel: new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.7, metalness: 0.3, clippingPlanes: planes, clipShadows: true }),
+    log: new THREE.MeshStandardMaterial({ color: '#4a3020', roughness: 0.95, clippingPlanes: planes, clipShadows: true }),
+    ember: new THREE.MeshStandardMaterial({ color: '#2a1408', emissive: '#ff5a10', emissiveIntensity: 0, roughness: 1, clippingPlanes: planes }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#2b2f33', transparent: true, opacity: 0.18, roughness: 0.05, clearcoat: 1, depthWrite: false, clippingPlanes: planes }),
+    flame: new THREE.SpriteMaterial({ map: getFlameTexture(), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false, clippingPlanes: planes }),
+  }), [planes])
   const flames = useMemo(() => Array.from({ length: 7 }, (_, i) => ({ x: (i / 6 - 0.5) * (w - 0.3), phase: i * 1.7, size: 0.13 + (i % 3) * 0.035 })), [w])
   const sprites = useRef<(THREE.Sprite | null)[]>([])
   const light = useRef<THREE.PointLight>(null)
@@ -424,7 +399,8 @@ function Fireplace({ id, w, sill, head, t, top }: P) {
 
   const inner = t - 0.03
   return (
-    <group>
+    // Klik på pejsen tænder/slukker den — der er ingen vægkontakt.
+    <Clickable onActivate={() => toggleDoor(id)}>
       {/* Brændkammer (sort foring i hullet) */}
       <mesh material={mats.steel} position={[0, sill + 0.01, 0]}><boxGeometry args={[w, 0.02, inner]} /></mesh>
       <mesh material={mats.steel} position={[0, head - 0.01, 0]}><boxGeometry args={[w, 0.02, inner]} /></mesh>
@@ -449,36 +425,7 @@ function Fireplace({ id, w, sill, head, t, top }: P) {
           {[-1, 1].map((sx) => <mesh key={sx} material={mats.steel} position={[sx * (w / 2 - 0.015), 0, 0]}><boxGeometry args={[0.03, h, 0.02]} /></mesh>)}
         </group>
       ))}
-      {/* Vægkontakter på begge sider af væggen, til højre for pejsen set fra hver side */}
-      <WallSwitch position={[w / 2 + 0.45, Math.min(1.1, top - 0.12), t / 2 + 0.007]} on={lit} onToggle={() => toggleDoor(id)} />
-      <group rotation={[0, Math.PI, 0]}>
-        <WallSwitch position={[w / 2 + 0.45, Math.min(1.1, top - 0.12), t / 2 + 0.007]} on={lit} onToggle={() => toggleDoor(id)} />
-      </group>
-    </group>
-  )
-}
-
-/** Hvid vippekontakt. Vippen står skråt efter tilstand, og en lille orange diode lyser når den er tændt. */
-export function WallSwitch({ position, on, onToggle }: { position: [number, number, number]; on: boolean; onToggle: () => void }) {
-  const [hover, setHover] = useState(false)
-  const mats = useMemo(() => ({
-    plate: new THREE.MeshStandardMaterial({ color: '#f4f4f2', roughness: 0.35 }),
-    led: new THREE.MeshStandardMaterial({ color: '#331100', emissive: '#ff8a1a', emissiveIntensity: 0, toneMapped: false }),
-  }), [])
-  mats.led.emissiveIntensity = on ? 2.5 : 0
-  return (
-    <group position={position}
-      onClick={(e) => { e.stopPropagation(); onToggle() }}
-      onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { setHover(false); document.body.style.cursor = '' }}>
-      <mesh material={mats.plate} castShadow><boxGeometry args={[0.085, 0.085, 0.01]} /></mesh>
-      <mesh material={mats.plate} position={[0, 0, 0.009]} rotation={[on ? -0.18 : 0.18, 0, 0]} scale={hover ? 1.08 : 1}>
-        <boxGeometry args={[0.04, 0.055, 0.008]} />
-      </mesh>
-      <mesh material={mats.led} position={[0.028, -0.032, 0.0055]}><boxGeometry args={[0.006, 0.006, 0.002]} /></mesh>
-      {/* Usynlig, større klikflade */}
-      <mesh position={[0, 0, 0.012]} visible={false}><boxGeometry args={[0.25, 0.25, 0.02]} /></mesh>
-    </group>
+    </Clickable>
   )
 }
 
@@ -490,9 +437,9 @@ const hingeMat = new THREE.MeshStandardMaterial({ color: '#b9bcbf', roughness: 0
  * Lokalt: centreret, bredde langs x, tykkelse langs z. `freeSide` = den side (±x) grebet sidder i.
  */
 function DoorLeaf({ w, h, freeSide }: { w: number; h: number; freeSide: 1 | -1 }) {
-  const m = getMaterials()
+  const { m, planes } = useClip()
   const T = 0.04
-  const groove = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e4e3df', roughness: 0.5 }), [])
+  const groove = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e4e3df', roughness: 0.5, clippingPlanes: planes }), [planes])
   const inset = 0.11, gap = 0.12
   // To fyldinger (øverst stor, nederst lavere) markeret med tynde fræsespor på begge flader.
   const panels = h > 1.5
@@ -521,13 +468,14 @@ function DoorLeaf({ w, h, freeSide }: { w: number; h: number; freeSide: 1 | -1 }
 
 /** Dørgreb (roset + vandret greb) på begge sider af et dørblad med tykkelse t. Grebet peger mod `dir` (±x). */
 function LeverHandles({ x, y, t, dir }: { x: number; y: number; t: number; dir: 1 | -1 }) {
+  const handle = useClip().clip(handleMat)
   return (
     <group position={[x, y, 0]}>
       {[1, -1].map((side) => (
         <group key={side} position={[0, 0, side * (t / 2)]}>
-          <mesh material={handleMat} position={[0, 0, side * 0.004]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.026, 0.026, 0.008, 24]} /></mesh>
-          <mesh material={handleMat} position={[0, 0, side * 0.03]} rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.009, 0.009, 0.052, 12]} /></mesh>
-          <mesh material={handleMat} position={[dir * 0.06, 0, side * 0.055]} rotation={[0, 0, Math.PI / 2]} castShadow><capsuleGeometry args={[0.0095, 0.11, 6, 12]} /></mesh>
+          <mesh material={handle} position={[0, 0, side * 0.004]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.026, 0.026, 0.008, 24]} /></mesh>
+          <mesh material={handle} position={[0, 0, side * 0.03]} rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.009, 0.009, 0.052, 12]} /></mesh>
+          <mesh material={handle} position={[dir * 0.06, 0, side * 0.055]} rotation={[0, 0, Math.PI / 2]} castShadow><capsuleGeometry args={[0.0095, 0.11, 6, 12]} /></mesh>
         </group>
       ))}
     </group>
@@ -536,11 +484,12 @@ function LeverHandles({ x, y, t, dir }: { x: number; y: number; t: number; dir: 
 
 /** Tre hængsler på bladets hængselkant. */
 function Hinges({ x, h }: { x: number; h: number }) {
+  const hinge = useClip().clip(hingeMat)
   if (h < 1.2) return null
   return (
     <>
       {[h / 2 - 0.2, 0.05, -h / 2 + 0.22].map((y) => (
-        <mesh key={y} material={hingeMat} position={[x, y, 0]}><cylinderGeometry args={[0.009, 0.009, 0.1, 12]} /></mesh>
+        <mesh key={y} material={hinge} position={[x, y, 0]}><cylinderGeometry args={[0.009, 0.009, 0.1, 12]} /></mesh>
       ))}
     </>
   )

@@ -1,7 +1,7 @@
 import { RoundedBox, useGLTF } from '@react-three/drei'
 import { Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
-import { useFrame, type ThreeEvent } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { toggleDoor, useStore } from '../store'
 import { createGame } from './games'
 import { getMaterials } from './materials'
@@ -9,6 +9,9 @@ import { meterBox } from './util'
 import furnitureData from '../../../data/furniture.json'
 import { QUALITY } from './quality'
 import { StaticBatch } from './StaticBatch'
+import { Clickable, toggleProps } from './interact'
+import { ShowScreen } from './TvShow'
+import { SHOWS } from './show'
 
 type V3 = [number, number, number]
 
@@ -93,8 +96,8 @@ function At({ p, rot = 0, children }: { p: V3; rot?: number; children: ReactNode
  * Seng. Med `duvetW` ligger der kun en enkeltdyne i den ene side (+x), og med `plush` fyldes resten af
  * madrassen med bamser og tøjdyr. Lokalt: hovedgærde ved -z, fodende ved +z.
  */
-function Bed({ p, rot = 0, w, l = 2.05, duvet, duvetW, plush = 0 }: {
-  p: V3; rot?: number; w: number; l?: number; duvet: THREE.Material; duvetW?: number; plush?: number
+function Bed({ p, rot = 0, w, l = 2.05, duvet, duvetW, plush = 0, squarePillows = false }: {
+  p: V3; rot?: number; w: number; l?: number; duvet: THREE.Material; duvetW?: number; plush?: number; squarePillows?: boolean
 }) {
   const f = fm()
   const dw = Math.min(duvetW ?? w + 0.02, w + 0.02)
@@ -106,11 +109,16 @@ function Bed({ p, rot = 0, w, l = 2.05, duvet, duvetW, plush = 0 }: {
       <Box p={[0, 0.44, 0.02]} s={[w - 0.04, 0.18, l - 0.08]} m={f.linen} />
       <Box p={[dx, 0.56, 0.32]} s={[dw, 0.08, l - 0.66]} m={duvet} />
       <Box p={[0, 0.65, -l / 2 + 0.05]} s={[w + 0.04, 0.95, 0.08]} m={f.fabricGrey} />
-      {pillows.map((x) => (
-        <mesh key={x} material={f.linen} position={[x, 0.6, -l / 2 + 0.3]} scale={[pillows.length > 1 ? 0.32 : Math.min(0.35, dw / 2 - 0.04), 0.07, 0.2]} castShadow>
-          <sphereGeometry args={[1, 16, 10]} />
-        </mesh>
-      ))}
+      {pillows.map((x) => {
+        const pw = pillows.length > 1 ? 0.32 : Math.min(0.35, dw / 2 - 0.04)
+        return squarePillows ? (
+          <RoundedBox key={x} args={[pw * 2, 0.11, pw * 1.7]} radius={0.025} smoothness={2} position={[x, 0.585, -l / 2 + 0.3]} material={f.linen} castShadow />
+        ) : (
+          <mesh key={x} material={f.linen} position={[x, 0.6, -l / 2 + 0.3]} scale={[pw, 0.07, 0.2]} castShadow>
+            <sphereGeometry args={[1, 16, 10]} />
+          </mesh>
+        )
+      })}
       {plush > 0 && (
         <PlushPile count={plush} x0={-w / 2 + 0.05} x1={w / 2 - dw - 0.01} z0={-l / 2 + 0.14} z1={l / 2 - 0.08} y={0.53}
           extra={[[dx - 0.12, -l / 2 + 0.33], [dx + 0.14, -l / 2 + 0.36], [dx + 0.05, l / 2 - 0.22]]} />
@@ -228,7 +236,7 @@ function GameScreen({ kind, w, h, position }: { kind: string; w: number; h: numb
   return <mesh material={mat} position={position}><planeGeometry args={[w, h]} /></mesh>
 }
 
-function Desk({ p, rot = 0, w = 1.2, game }: { p: V3; rot?: number; w?: number; game?: string }) {
+function Desk({ p, rot = 0, w = 1.2, game, chairColor }: { p: V3; rot?: number; w?: number; game?: string; chairColor?: string }) {
   const f = fm()
   return (
     <At p={p} rot={rot}>
@@ -239,19 +247,20 @@ function Desk({ p, rot = 0, w = 1.2, game }: { p: V3; rot?: number; w?: number; 
       <Box p={[0.2, 0.95, -0.15]} s={[0.5, 0.32, 0.02]} m={f.screen} />
       {game && <GameScreen kind={game} w={0.48} h={0.3} position={[0.2, 0.95, -0.1395]} />}
       <Box p={[0.2, 0.78, -0.15]} s={[0.04, 0.12, 0.04]} m={f.blackSteel} />
-      <OfficeChair p={[0, 0, 0.55]} rot={Math.PI} />
+      <OfficeChair p={[0, 0, 0.55]} rot={Math.PI} color={chairColor} />
     </At>
   )
 }
 
-function OfficeChair({ p, rot = 0 }: { p: V3; rot?: number }) {
+function OfficeChair({ p, rot = 0, color }: { p: V3; rot?: number; color?: string }) {
   const f = fm()
+  const seat = useMemo(() => (color ? new THREE.MeshStandardMaterial({ color, roughness: 1 }) : f.fabricBlue), [color])
   return (
     <At p={p} rot={rot}>
       <mesh material={f.blackSteel} position={[0, 0.25, 0]} castShadow><cylinderGeometry args={[0.025, 0.025, 0.4, 8]} /></mesh>
       <mesh material={f.blackSteel} position={[0, 0.04, 0]}><cylinderGeometry args={[0.3, 0.3, 0.03, 5]} /></mesh>
-      <Box p={[0, 0.47, 0]} s={[0.46, 0.07, 0.44]} m={f.fabricBlue} />
-      <Box p={[0, 0.78, -0.21]} s={[0.44, 0.52, 0.06]} m={f.fabricBlue} />
+      <Box p={[0, 0.47, 0]} s={[0.46, 0.07, 0.44]} m={seat} />
+      <Box p={[0, 0.78, -0.21]} s={[0.44, 0.52, 0.06]} m={seat} />
     </At>
   )
 }
@@ -329,7 +338,7 @@ function Toilet({ id }: { id?: string }) {
       <mesh geometry={geo.seat} material={f.porcelain} position={[0, 0.4, seatZ]} castShadow />
       {/* Låg: hængslet bagtil, klik løfter det op mod væggen */}
       <group ref={lid} position={[0, 0.422, 0.04]} userData={{ dynamic: true }}>
-        <group {...(id ? applianceClick(id) : {})}>
+        <group {...(id ? toggleProps(id) : {})}>
           <mesh geometry={geo.lid} material={f.porcelain} position={[0, 0, seatZ - 0.04]} castShadow />
         </group>
       </group>
@@ -490,13 +499,31 @@ function WoodStove({ p }: { p: V3 }) {
   )
 }
 
-function Tv({ p, rot = 0, width = 1.45, game }: { p: V3; rot?: number; width?: number; game?: string }) {
+/**
+ * Fladskærm. Klik tænder/slukker den (delt via serverens openDoors som alt andet), og når der tændes
+ * ruller streamingtjenestens logo, hvorefter showet fortsætter præcis hvor man var kommet til.
+ * Slukket er skærmen sort på nær standby-dioden.
+ */
+function Tv({ p, rot = 0, width = 1.45, id, game, show }: {
+  p: V3; rot?: number; width?: number; id?: string; game?: string; show?: string
+}) {
   const f = fm()
   const h = width * 0.5625 + 0.02
+  const on = useStore((s) => s.snapshot?.openDoors.includes(id ?? '') ?? false)
+  const content = show ? SHOWS[show] : undefined
   return (
     <At p={p} rot={rot}>
-      <Box p={[0, 0, 0]} s={[width, h, 0.035]} m={f.screen} />
-      {game && <GameScreen kind={game} w={width - 0.03} h={h - 0.03} position={[0, 0, 0.0185]} />}
+      <Clickable onActivate={() => { if (id) toggleDoor(id) }} enabled={!!id}>
+        <Box p={[0, 0, 0]} s={[width, h, 0.035]} m={f.screen} />
+        {on && (content
+          ? <ShowScreen id={id!} show={content} w={width - 0.03} h={h - 0.03} position={[0, 0, 0.0185]} />
+          : game && <GameScreen kind={game} w={width - 0.03} h={h - 0.03} position={[0, 0, 0.0185]} />)}
+        {/* Standby-diode: rød når skærmen er slukket, så man kan se at der er noget at klikke på */}
+        <mesh position={[width / 2 - 0.07, -h / 2 + 0.012, 0.019]}>
+          <boxGeometry args={[0.014, 0.004, 0.004]} />
+          <meshStandardMaterial color="#120406" emissive={on ? '#1d4a2a' : '#d02020'} emissiveIntensity={on ? 0.5 : 2.2} toneMapped={false} />
+        </mesh>
+      </Clickable>
     </At>
   )
 }
@@ -538,7 +565,6 @@ function KitchenRun({ length }: { length: number }) {
       <Box p={[0, 0.44, 0]} s={[length, 0.88, 0.6]} m={f.white} />
       <Box p={[0, 0.9, 0]} s={[length + 0.02, 0.035, 0.63]} m={f.darkTop} />
       <Box p={[0.04, 0.92, 0.02]} s={[0.6, 0.006, 0.52]} m={f.blackGlass} shadow={false} />
-      <WallMounted><Box p={[0, 1.75, -0.11]} s={[length, 0.7, 0.36]} m={f.white} /></WallMounted>
     </group>
   )
 }
@@ -557,12 +583,16 @@ function Counter({ length }: { length: number }) {
 
 function KitchenIsland() {
   const f = fm()
+  // Håndvask mod -x (gangen mellem køkkenrækken og øen), med kant, nedsænket skål, afløb og høj blandingsbatteri.
+  const sinkX = -0.25, sinkZ = -0.4
   return (
     <group>
       <Box p={[0, 0.44, 0]} s={[1.0, 0.88, 2.2]} m={f.white} />
       <Box p={[0.08, 0.9, 0]} s={[1.25, 0.04, 2.3]} m={f.stone} />
-      <Box p={[-0.25, 0.905, -0.4]} s={[0.4, 0.01, 0.5]} m={f.steel} shadow={false} />
-      <mesh material={f.steel} position={[-0.4, 1.08, -0.4]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
+      <RoundedBox args={[0.46, 0.022, 0.54]} radius={0.03} smoothness={2} position={[sinkX, 0.922, sinkZ]} material={f.steel} castShadow receiveShadow />
+      <Box p={[sinkX, 0.903, sinkZ]} s={[0.38, 0.012, 0.46]} m={f.blackSteel} shadow={false} />
+      <mesh material={f.blackGlass} position={[sinkX, 0.898, sinkZ]}><cylinderGeometry args={[0.018, 0.018, 0.01, 16]} /></mesh>
+      <mesh material={f.steel} position={[sinkX + 0.14, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
     </group>
   )
 }
@@ -583,34 +613,51 @@ function DiningTable({ w, d }: { w: number; d: number }) {
  * Vaskemaskine og tørretumbler ved siden af hinanden, hver på en sokkel med to skuffer.
  * Lokalt: front mod +z; vaskemaskinen til venstre (-x), tørretumbleren til højre.
  */
-function WasherDryer() {
-  const f = fm()
+function WasherDryer({ id }: { id?: string }) {
   const W = 0.6, D = 0.6, base = 0.36, H = 0.85
   return (
     <group>
-      {[-1, 1].map((side) => {
-        const x = side * (W / 2 + 0.005)
-        const dryer = side === 1
-        return (
-          <group key={side} position={[x, 0, 0]}>
-            {/* Sokkel med to skuffer */}
-            <Box p={[0, base / 2, -0.01]} s={[W, base, D - 0.02]} m={f.white} />
-            {[0, 1].map((k) => (
-              <group key={k}>
-                <Box p={[0, 0.02 + k * (base / 2) + base / 4 - 0.01, D / 2 - 0.005]} s={[W - 0.02, base / 2 - 0.02, 0.02]} m={f.white} />
-                <Box p={[0, 0.02 + k * (base / 2) + base / 4 + 0.03, D / 2 + 0.01]} s={[0.18, 0.012, 0.012]} m={f.steel} shadow={false} />
-              </group>
-            ))}
-            {/* Apparatet */}
-            <Box p={[0, base + H / 2, 0]} s={[W, H, D]} m={f.porcelain} />
-            <Box p={[0, base + H - 0.06, D / 2 + 0.002]} s={[W - 0.02, 0.1, 0.004]} m={f.white} shadow={false} />
-            <mesh material={f.blackGlass} position={[-0.17, base + H - 0.06, D / 2 + 0.008]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.03, 0.03, 0.012, 20]} /></mesh>
-            <Box p={[0.08, base + H - 0.06, D / 2 + 0.005]} s={[0.16, 0.04, 0.004]} m={f.screen} shadow={false} />
-            <mesh material={f.steel} position={[0, base + H * 0.42, D / 2 + 0.006]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
-            <mesh material={dryer ? f.screen : f.blackGlass} position={[0, base + H * 0.42, D / 2 + 0.013]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.155, 0.155, 0.006, 32]} /></mesh>
-          </group>
-        )
-      })}
+      <WasherDryerUnit x={-(W / 2 + 0.005)} dryer={false} id={id ? `${id}-vask` : undefined} W={W} D={D} base={base} H={H} />
+      <WasherDryerUnit x={W / 2 + 0.005} dryer={true} id={id ? `${id}-toer` : undefined} W={W} D={D} base={base} H={H} />
+    </group>
+  )
+}
+
+/** Én hvidevare (vaskemaskine eller tørretumbler): runde låge hængslet i yderkanten, klik åbner/lukker den med en animation. */
+function WasherDryerUnit({ x, dryer, id, W, D, base, H }: {
+  x: number; dryer: boolean; id?: string; W: number; D: number; base: number; H: number
+}) {
+  const f = fm()
+  const door = useRef<THREE.Group>(null)
+  const step = useApplianceOpen(id ?? '')
+  // Vaskemaskinen hængsler i venstre side (åbner mod -x), tørretumbleren i højre (åbner mod +x), så lågerne ikke mødes.
+  const hinge = dryer ? 1 : -1
+  const R = 0.19
+  useFrame((_, dt) => { if (door.current) door.current.rotation.y = step(dt) * hinge * -1.7 })
+  return (
+    <group position={[x, 0, 0]}>
+      {/* Sokkel med to skuffer */}
+      <Box p={[0, base / 2, -0.01]} s={[W, base, D - 0.02]} m={f.white} />
+      {[0, 1].map((k) => (
+        <group key={k}>
+          <Box p={[0, 0.02 + k * (base / 2) + base / 4 - 0.01, D / 2 - 0.005]} s={[W - 0.02, base / 2 - 0.02, 0.02]} m={f.white} />
+          <Box p={[0, 0.02 + k * (base / 2) + base / 4 + 0.03, D / 2 + 0.01]} s={[0.18, 0.012, 0.012]} m={f.steel} shadow={false} />
+        </group>
+      ))}
+      {/* Apparatet */}
+      <Box p={[0, base + H / 2, 0]} s={[W, H, D]} m={f.porcelain} />
+      <Box p={[0, base + H - 0.06, D / 2 + 0.002]} s={[W - 0.02, 0.1, 0.004]} m={f.white} shadow={false} />
+      <mesh material={f.blackGlass} position={[-0.17, base + H - 0.06, D / 2 + 0.008]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.03, 0.03, 0.012, 20]} /></mesh>
+      <Box p={[0.08, base + H - 0.06, D / 2 + 0.005]} s={[0.16, 0.04, 0.004]} m={f.screen} shadow={false} />
+      {/* Fast ramme rundt om lugehullet, så man ser den mørke åbning bag den hængslede låge */}
+      <mesh material={f.blackSteel} position={[0, base + H * 0.42, D / 2 + 0.004]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.165, 0.165, 0.01, 32]} /></mesh>
+      {/* Rund luge: hængslet i yderkanten, klik åbner/lukker den */}
+      <group ref={door} position={[hinge * R, base + H * 0.42, D / 2 + 0.006]} userData={{ dynamic: true }}>
+        <group {...(id ? toggleProps(id) : {})}>
+          <mesh material={f.steel} position={[hinge * -R, 0, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
+          <mesh material={dryer ? f.screen : f.blackGlass} position={[hinge * -R, 0, 0.007]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.155, 0.155, 0.006, 32]} /></mesh>
+        </group>
+      </group>
     </group>
   )
 }
@@ -944,8 +991,8 @@ function WingChair({ color }: { color: string }) {
       <instancedMesh ref={fringeRef} args={[undefined, fringeMat, perimeter.length]} castShadow>
         <boxGeometry args={[0.005, 0.17, 0.005]} />
       </instancedMesh>
-      {/* Tyk siddehynde der buler lidt frem */}
-      <RoundedBox args={[0.62, 0.15, 0.7]} radius={0.065} smoothness={5} position={[0, 0.5, 0.06]} material={m} castShadow receiveShadow />
+      {/* Tyk siddehynde der buler lidt frem — sædet er 20% mindre dybt end før, flugter bagtil med ryglænet */}
+      <RoundedBox args={[0.62, 0.15, 0.56]} radius={0.065} smoothness={5} position={[0, 0.5, -0.01]} material={m} castShadow receiveShadow />
       {/* Ryg, let bagoverhældende */}
       <mesh geometry={geo.back} material={m} position={[0, 0.42, -D / 2 + 0.1]} rotation={[-0.12, 0, 0]} castShadow receiveShadow />
       {/* Almindelige polstrede armlæn med rullet top */}
@@ -1012,12 +1059,7 @@ function ConcreteBlock({ w = 0.45, h = 0.42, d = 0.45, legs = 0, contents }: {
   const m = getMaterials()
   const f = fm()
   const t = 0.05 // godstykkelse omkring det firkantede hul (hullet går fra front til bagside)
-  const parts = useMemo(() => [
-    { g: meterBox(w, t, d), y: t / 2, x: 0 },
-    { g: meterBox(w, t, d), y: h - t / 2, x: 0 },
-    { g: meterBox(t, h - 2 * t, d), y: h / 2, x: -w / 2 + t / 2 },
-    { g: meterBox(t, h - 2 * t, d), y: h / 2, x: w / 2 - t / 2 },
-  ], [w, h, d])
+  const r = 0.008 // lette afrundede kanter
   const legGeo = useMemo(() => new THREE.CylinderGeometry(0.018, 0.013, legs, 12), [legs])
   const inner = { w: w - 2 * t, h: h - 2 * t, d }
   return (
@@ -1026,7 +1068,10 @@ function ConcreteBlock({ w = 0.45, h = 0.42, d = 0.45, legs = 0, contents }: {
         <mesh key={`${sx}${sz}`} geometry={legGeo} material={f.oak} position={[sx * (w / 2 - 0.045), legs / 2, sz * (d / 2 - 0.045)]} castShadow />
       ))}
       <group position={[0, legs, 0]}>
-        {parts.map((p, i) => <mesh key={i} geometry={p.g} material={m.concrete} position={[p.x, p.y, 0]} castShadow receiveShadow />)}
+        <RoundedBox args={[w, t, d]} radius={r} smoothness={2} position={[0, t / 2, 0]} material={m.tvBlockConcrete} castShadow receiveShadow />
+        <RoundedBox args={[w, t, d]} radius={r} smoothness={2} position={[0, h - t / 2, 0]} material={m.tvBlockConcrete} castShadow receiveShadow />
+        <RoundedBox args={[t, h - 2 * t, d]} radius={r} smoothness={2} position={[-w / 2 + t / 2, h / 2, 0]} material={m.tvBlockConcrete} castShadow receiveShadow />
+        <RoundedBox args={[t, h - 2 * t, d]} radius={r} smoothness={2} position={[w / 2 - t / 2, h / 2, 0]} material={m.tvBlockConcrete} castShadow receiveShadow />
         <group position={[0, t, 0]}>
           {contents === 'games' && <GameCases width={inner.w} />}
           {contents === 'blackBox' && <Box p={[0, 0.045, 0.02]} s={[inner.w - 0.08, 0.09, d * 0.62]} m={f.blackGlass} />}
@@ -1082,7 +1127,8 @@ const hifiMats = (() => {
 })()
 
 /** Linn-forstærker/streamer: lav aluminiumskasse med sort front, display og drejeknap på toppen. Front mod +z. */
-function LinnAmp() {
+/** Linn hi-fi-enhed. kind "cd" (Ikemi) får en rund diskklemme ovenpå i stedet for blot en knap. */
+function LinnUnit({ kind = 'amp' }: { kind?: string }) {
   const m = hifiMats()
   const W = 0.38, H = 0.09, D = 0.36
   return (
@@ -1091,6 +1137,9 @@ function LinnAmp() {
       <mesh material={m.black} position={[0, H / 2, D / 2 + 0.001]}><boxGeometry args={[W - 0.02, H - 0.025, 0.004]} /></mesh>
       <mesh material={m.display} position={[-0.05, H / 2, D / 2 + 0.004]}><boxGeometry args={[0.12, 0.022, 0.002]} /></mesh>
       <mesh material={m.alu} position={[0.08, H + 0.006, 0.06]} castShadow><cylinderGeometry args={[0.045, 0.048, 0.014, 40]} /></mesh>
+      {kind === 'cd' && (
+        <mesh material={m.black} position={[-0.06, H + 0.004, -0.06]} castShadow><cylinderGeometry args={[0.065, 0.065, 0.008, 40]} /></mesh>
+      )}
     </group>
   )
 }
@@ -1484,6 +1533,8 @@ function Vitrine({ w = 1.5, h = 2.0, d = 0.4 }: { w?: number; h?: number; d?: nu
       <Box p={[0, h / 2, -d / 2 + T / 2]} s={[w, h, T]} m={mats.body} />
       {[-1, 1].map((sx) => <Box key={sx} p={[sx * (w / 2 - T / 2), h / 2, 0]} s={[T, h, d]} m={mats.body} />)}
       <Box p={[0, h - T / 2, 0]} s={[w, T, d]} m={mats.body} />
+      {/* Topplade der rager ca. 10 cm ud over skabet hele vejen rundt */}
+      <Box p={[0, h + 0.015, 0]} s={[w + 0.2, 0.03, d + 0.2]} m={mats.body} />
       <Box p={[0, plinth / 2, 0]} s={[w, plinth, d]} m={mats.body} />
       <Box p={[0, plinth + T / 2, 0]} s={[innerW, T, innerD]} m={mats.body} />
       {/* Glashylder */}
@@ -1681,16 +1732,6 @@ function useApplianceOpen(id: string) {
   }
 }
 
-const applianceClick = (id: string) => ({
-  onClick: (e: ThreeEvent<MouseEvent>) => {
-    if (useStore.getState().tool === 'vector') return
-    e.stopPropagation()
-    toggleDoor(id)
-  },
-  onPointerOver: (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); document.body.style.cursor = 'pointer' },
-  onPointerOut: () => { document.body.style.cursor = '' },
-})
-
 const kitchenMats = (() => {
   let c: ReturnType<typeof make> | null = null
   function make() {
@@ -1780,7 +1821,7 @@ function Fridge({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: num
       })}
       {/* Lågen: hængslet i venstre side, med dørhylder på indersiden */}
       <group ref={door} position={[-cw / 2 + 0.003, 0, D / 2 - 0.011]} userData={{ dynamic: true }}>
-        <group position={[cw / 2 - 0.003, 0, 0]} {...applianceClick(id)}>
+        <group position={[cw / 2 - 0.003, 0, 0]} {...toggleProps(id)}>
           <RoundedBox args={[cw - 0.006, H - 0.106, 0.022]} radius={0.005} smoothness={2} position={[0, (H + 0.1) / 2, 0]} material={f.white} castShadow />
           <Box p={[cw / 2 - 0.05, 1.05, 0.02]} s={[0.018, 0.5, 0.018]} m={f.steel} />
           {[0.6, 1.0, 1.4].map((y) => (
@@ -1840,7 +1881,7 @@ function OvenColumn({ id, x, cw, H, D }: { id: string; x: number; cw: number; H:
       </group>
       {/* Låge: hængslet i bunden, klik åbner/lukker */}
       <group ref={door} position={[0, 0.86 + gap, fz]} userData={{ dynamic: true }}>
-        <group {...applianceClick(id)}>
+        <group {...toggleProps(id)}>
           <Box p={[0, 0.25 - gap, -0.002]} s={[cw - 2 * gap, 0.5 - 2 * gap, 0.026]} m={k.ovenGlass} />
           <mesh material={k.ovenGlass} position={[0, 0.22, 0.012]}><boxGeometry args={[cw - 0.12, 0.3, 0.002]} /></mesh>
           <Box p={[0, 0.44, 0.024]} s={[cw - 0.1, 0.018, 0.018]} m={f.steel} />
@@ -1895,7 +1936,7 @@ function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: nu
         const yc = bottom + dh * (i + 0.5)
         return (
           <group key={i} ref={(g) => { drawers.current[i] = g }} userData={{ dynamic: true }}>
-            <group {...(doorOpen ? applianceClick(drawerIds[i]) : {})}>
+            <group {...(doorOpen ? toggleProps(drawerIds[i]) : {})}>
               {/* Skuffekasse i blåligt plast med greb-kant foran */}
               <Box p={[0, yc - dh / 2 + 0.012, -0.01]} s={[inW - 0.01, 0.012, inD]} m={blue} shadow={false} />
               {[-1, 1].map((s) => <Box key={s} p={[s * (inW / 2 - 0.01), yc - 0.02, -0.01]} s={[0.008, dh - 0.06, inD]} m={blue} shadow={false} />)}
@@ -1911,7 +1952,7 @@ function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: nu
       })}
       {/* Lågen: hængslet i højre side */}
       <group ref={door} position={[cw / 2 - 0.003, 0, D / 2 - 0.011]} userData={{ dynamic: true }}>
-        <group position={[-cw / 2 + 0.003, 0, 0]} {...applianceClick(id)}>
+        <group position={[-cw / 2 + 0.003, 0, 0]} {...toggleProps(id)}>
           <RoundedBox args={[cw - 0.006, H - 0.106, 0.022]} radius={0.005} smoothness={2} position={[0, (H + 0.1) / 2, 0]} material={f.white} castShadow />
           <Box p={[-cw / 2 + 0.05, 1.05, 0.02]} s={[0.018, 0.5, 0.018]} m={f.steel} />
         </group>
@@ -1951,7 +1992,7 @@ function TarnabyLamp({ id, position }: { id: string; position: V3 }) {
   const base = useMemo(() => new THREE.LatheGeometry([[0, 0], [0.072, 0], [0.074, 0.012], [0.07, 0.03], [0.05, 0.06], [0.045, 0.072], [0.042, 0.075], [0, 0.075]].map(([x, y]) => new THREE.Vector2(x, y)), 32), [])
   const dome = useMemo(() => new THREE.LatheGeometry([[0.036, 0], [0.05, 0.015], [0.052, 0.09], [0.046, 0.13], [0.03, 0.15], [0.03, 0.165]].map(([x, y]) => new THREE.Vector2(x, y)), 32), [])
   return (
-    <group position={position} {...applianceClick(id)}>
+    <group position={position} {...toggleProps(id)}>
       <mesh geometry={base} material={m.base} castShadow />
       <mesh material={m.brass} position={[0.05, 0.045, 0.02]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.009, 0.009, 0.012, 14]} /></mesh>
       <mesh material={m.brass} position={[0, 0.08, 0]}><cylinderGeometry args={[0.034, 0.038, 0.01, 24]} /></mesh>
@@ -1962,26 +2003,71 @@ function TarnabyLamp({ id, position }: { id: string; position: V3 }) {
   )
 }
 
-/** Grå sovesofa: lige model med polstrede armlæn og to siddehynder. Lokalt: front mod +z. */
-function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85 }: { color?: string; w?: number; d?: number }) {
+/**
+ * Loftspot (indbygget). Flere spots kan dele samme `id`, så de tænder/slukker samtidig ved klik —
+ * tilstanden er den samme boolean fra serveren (openDoors), ikke dæmpbar som Tärnaby-lampen.
+ */
+function CeilingSpot({ id }: { id: string }) {
+  const on = useStore((s) => s.snapshot?.openDoors.includes(id) ?? false)
+  const m = useMemo(() => ({
+    housing: new THREE.MeshStandardMaterial({ color: '#2a2b2d', roughness: 0.4, metalness: 0.6 }),
+    lens: new THREE.MeshStandardMaterial({ color: '#fff8ec', emissive: '#fff2d8', emissiveIntensity: 0, toneMapped: false }),
+  }), [])
+  m.lens.emissiveIntensity = on ? 2.2 : 0
+  return (
+    <group {...toggleProps(id)}>
+      <mesh material={m.housing} castShadow><cylinderGeometry args={[0.045, 0.05, 0.02, 24]} /></mesh>
+      <mesh material={m.lens} position={[0, -0.011, 0]}><cylinderGeometry args={[0.034, 0.034, 0.004, 24]} /></mesh>
+      {on && <pointLight position={[0, -0.08, 0]} color="#fff2d8" intensity={1.1} distance={3.4} decay={2} />}
+    </group>
+  )
+}
+
+/**
+ * Grå sovesofa: lige model med polstrede armlæn og to siddehynder. Lokalt: front mod +z.
+ * Klik folder den ud til en seng: rygpuden vipper ned og bliver en del af liggefladen, og en skjult
+ * udtræksmadras glider frem under sædet, så den samlede længde næsten fordobles. Nyt klik folder den sammen.
+ */
+function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: string; w?: number; d?: number; id?: string }) {
   const f = fm()
   const m = velour(color)
   const arm = 0.17
   const inner = w - 2 * arm
+  const back = useRef<THREE.Group>(null)
+  const ext = useRef<THREE.Group>(null)
+  const openT = useRef(0)
+  const step = useApplianceOpen(id ?? '')
+  const open = useStore((s) => s.snapshot?.openDoors.includes(id ?? '') ?? false)
+  useFrame((_, dt) => {
+    const t = step(dt)
+    openT.current = t
+    if (back.current) back.current.rotation.x = t * (Math.PI / 2 - 0.03)
+    if (ext.current) ext.current.position.z = d / 2 - 0.02 + t * (d - 0.12)
+  })
   return (
-    <group>
-      <RoundedBox args={[w, 0.26, d]} radius={0.03} smoothness={3} position={[0, 0.23, 0]} material={m} castShadow receiveShadow />
-      {[-1, 1].map((s) => (
-        <RoundedBox key={s} args={[inner / 2 - 0.01, 0.16, d - 0.2]} radius={0.06} smoothness={4} position={[s * inner / 4, 0.44, 0.08]} material={m} castShadow receiveShadow />
-      ))}
-      <RoundedBox args={[inner, 0.42, 0.22]} radius={0.08} smoothness={4} position={[0, 0.6, -d / 2 + 0.13]} material={m} castShadow />
-      {[-1, 1].map((s) => (
-        <RoundedBox key={`a${s}`} args={[arm, 0.56, d]} radius={0.05} smoothness={3} position={[s * (w / 2 - arm / 2), 0.38, 0]} material={m} castShadow />
-      ))}
-      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
-        <mesh key={`${x}${z}`} material={f.darkWood} position={[x * (w / 2 - 0.06), 0.05, z * (d / 2 - 0.06)]}><cylinderGeometry args={[0.02, 0.016, 0.1, 10]} /></mesh>
-      ))}
-    </group>
+    <Clickable onActivate={() => id && toggleDoor(id)} enabled={!!id}>
+      <group>
+        <RoundedBox args={[w, 0.26, d]} radius={0.03} smoothness={3} position={[0, 0.23, 0]} material={m} castShadow receiveShadow />
+        {[-1, 1].map((s) => (
+          <RoundedBox key={s} args={[inner / 2 - 0.01, 0.16, d - 0.2]} radius={0.06} smoothness={4} position={[s * inner / 4, 0.44, 0.08]} material={m} castShadow receiveShadow />
+        ))}
+        {/* Udtræksmadras: skjult under sædet, glider frem og fordobler liggefladen når sofaen foldes ud */}
+        <group ref={ext} position={[0, 0, d / 2 - 0.02]}>
+          <RoundedBox args={[inner, 0.22, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.2, (d - 0.1) / 2]} material={m} castShadow receiveShadow />
+          {open && <Box p={[0, 0.33, (d - 0.1) / 2]} s={[inner - 0.06, 0.07, d - 0.22]} m={f.linen} />}
+        </group>
+        {/* Rygpude: hængslet ved sædet, vipper fremad og ned i stedet for at stå op, når sofaen folder ud */}
+        <group ref={back} position={[0, 0.36, -d / 2 + 0.02]}>
+          <RoundedBox args={[inner, 0.42, 0.22]} radius={0.08} smoothness={4} position={[0, 0.21, 0.11]} material={m} castShadow />
+        </group>
+        {[-1, 1].map((s) => (
+          <RoundedBox key={`a${s}`} args={[arm, 0.56, d]} radius={0.05} smoothness={3} position={[s * (w / 2 - arm / 2), 0.38, 0]} material={m} castShadow />
+        ))}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+          <mesh key={`${x}${z}`} material={f.darkWood} position={[x * (w / 2 - 0.06), 0.05, z * (d / 2 - 0.06)]}><cylinderGeometry args={[0.02, 0.016, 0.1, 10]} /></mesh>
+        ))}
+      </group>
+    </Clickable>
   )
 }
 
@@ -2189,6 +2275,18 @@ function WallMirror({ w = 0.75, h = 0.75 }: { w?: number; h?: number }) {
   )
 }
 
+/** Flisebelagt halvmur med en lys kant foroven. Lokalt: langs x, centreret; front/bagside symmetrisk. */
+function HalfWall({ length, h = 1.2, t = 0.1 }: { length: number; h?: number; t?: number }) {
+  const m = getMaterials()
+  const f = fm()
+  return (
+    <group>
+      <Box p={[0, h / 2, 0]} s={[length, h, t]} m={m.bathTile} />
+      <Box p={[0, h + 0.012, 0]} s={[length + 0.04, 0.024, t + 0.06]} m={f.stone} shadow={false} />
+    </group>
+  )
+}
+
 /** Lille indrammet familiefoto på væggen. */
 function WallPicture({ w = 0.24, h = 0.32, photo = 0 }: { w?: number; h?: number; photo?: number }) {
   const mats = useMemo(() => {
@@ -2298,7 +2396,17 @@ export interface FurnitureItem {
   layout?: number[]
   /** Spil pr. skærmgruppe: "racer" | "blocks". */
   games?: string[]
+  /** Tv: hvilket show skærmen afspiller (nøgle i three/show.ts). */
+  show?: string
   fronts?: string
+  /** Linn-enhed: "amp" | "pre" | "cd" (styrer top-detalje). */
+  variant?: string
+  /** Seng: firkantede puder (let afrundede hjørner) i stedet for ovale. */
+  squarePillows?: boolean
+  /** Skrivebord: farve på den indbyggede kontorstol. */
+  chairColor?: string
+  /** Delt tænd/sluk-id (fx flere loftspots der skal skifte samtidig). Falder tilbage til møblets eget id. */
+  applianceId?: string
 }
 
 export const furnitureItems = (furnitureData as unknown as { items: FurnitureItem[] }).items
@@ -2316,9 +2424,9 @@ function renderItem(it: FurnitureItem): ReactNode {
   switch (it.kind) {
     case 'model': return <Model name={it.model!} p={O} height={it.height} width={it.width} hide={it.hide} />
     case 'roundTable': return <RoundTable d={it.w} color={it.color} />
-    case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} />
+    case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} squarePillows={it.squarePillows} />
     case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} />
-    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} />
+    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
     case 'toilet': return <Toilet id={it.id} />
@@ -2327,9 +2435,9 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'bathtub': return <Bathtub p={O} />
     case 'shower': return <Shower p={O} />
     case 'woodStove': return <WoodStove p={O} />
-    case 'tv': return <Tv p={O} width={it.width} game={it.games?.[0]} />
+    case 'tv': return <Tv p={O} id={it.id} width={it.width} game={it.games?.[0]} show={it.show} />
     case 'concreteBlock': return <ConcreteBlock w={it.w} h={it.height} d={it.d} legs={it.legs} contents={it.contents} />
-    case 'linn': return <LinnAmp />
+    case 'linn': return <LinnUnit kind={it.variant} />
     case 'speaker': return <BWSpeaker color={it.color ?? '#8a4630'} />
     case 'ps5': return <PS5 />
     case 'sevenChair': return <SevenChair color={it.color} />
@@ -2341,13 +2449,15 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'gasGrill': return <GasGrill w={it.w} />
     case 'espresso': return <EspressoMachine />
     case 'nightstand': return <Nightstand lampId={it.lamp} />
-    case 'sleeperSofa': return <SleeperSofa color={it.color} w={it.w} d={it.d} />
+    case 'sleeperSofa': return <SleeperSofa color={it.color} w={it.w} d={it.d} id={it.id} />
     case 'doubleCabinet': return <DoubleCabinet w={it.w} h={it.height} d={it.d} color={it.color} />
     case 'easel': return <Easel />
     case 'benchPress': return <BenchPress />
     case 'squareTable': return <SquareTable w={it.w} />
     case 'printer3d': return <Printer3D />
     case 'wallMirror': return <WallMirror w={it.w} h={it.height} />
+    case 'halfWall': return <HalfWall length={it.length ?? 1} h={it.height} t={it.d} />
+    case 'ceilingLight': return <CeilingSpot id={it.applianceId ?? it.id} />
     case 'wallPicture': return <WallPicture w={it.w} h={it.height} photo={it.count} />
     case 'shoeRack': return <ShoeRack w={it.w} h={it.height} d={it.d} />
     case 'knax': return <Knax hooks={it.count} w={it.w} />
@@ -2361,7 +2471,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'tallCabinets': return <KitchenTall w={it.w ?? 2.2} />
     case 'kitchenIsland': return <KitchenIsland />
     case 'diningTable': return <DiningTable w={it.w ?? 2} d={it.d ?? 0.9} />
-    case 'washerDryer': return <WasherDryer />
+    case 'washerDryer': return <WasherDryer id={it.id} />
     case 'monitors': return <Monitors count={it.count ?? 1} size={it.width} layout={it.layout} games={it.games} />
     case 'workDesk': return <WorkDesk l={it.w ?? 1.6} d={it.d ?? 0.8} color={it.color} />
     case 'pcTower': return <PcTower />

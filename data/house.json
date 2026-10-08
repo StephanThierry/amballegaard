@@ -76,7 +76,7 @@
     { "id": "d-alrum-stue","at": [19.2, 8.11],  "width": 1.3, "type": "frenchDoor", "leaves": 2 },
     { "id": "d-stue-gang", "at": [20.07, 14.0], "width": 0.8, "type": "door" },
     { "id": "d-badS",      "at": [20.71, 13.1], "width": 0.8, "type": "door" },
-    { "id": "d-walkin",    "at": [21.35, 14.6], "width": 0.8, "type": "slidingDoor" }
+    { "id": "d-walkin",    "at": [21.35, 14.285], "width": 0.8, "type": "slidingDoor" }
   ],
 
   "rooms": [
@@ -110,7 +110,13 @@
     { "id": "toilet-badN", "kind": "toiletLid", "standAt": [22.7, 0.51] },
     { "id": "toilet-badS", "kind": "toiletLid", "standAt": [22.6, 11.0] },
     { "id": "lampe-nord", "kind": "lamp", "standAt": [22.6, 16.0] },
-    { "id": "lampe-syd", "kind": "lamp", "standAt": [22.6, 18.8] }
+    { "id": "lampe-syd", "kind": "lamp", "standAt": [22.6, 18.8] },
+    { "id": "tv", "kind": "tv", "standAt": [17.2, 11.65] },
+    { "id": "tv-sovevaerelse", "kind": "tv", "standAt": [21.1, 17.4] },
+    { "id": "vaskemaskine-vask", "kind": "washerDoor", "standAt": [11.3, 1.6] },
+    { "id": "vaskemaskine-toer", "kind": "dryerDoor", "standAt": [11.9, 1.6] },
+    { "id": "sovesofa-lisa", "kind": "sofaBed", "standAt": [10.46, 6.87] },
+    { "id": "lys-badS", "kind": "ceilingLight", "standAt": [21.7, 11.4] }
   ],
 
   "roofs": [

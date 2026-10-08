@@ -109,6 +109,13 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
+/* Talebobler fra tv'et: lidt bredere end beboernes, så en replik fra scenen kan være i én boble. */
+.bubble.tv { max-width: 270px; }
+.bubble em { display: block; font-size: 11px; opacity: 0.55; margin-bottom: 2px; }
+/* Publikums reaktion ([laughter], [cheers and applause] …) — varm og kursiv, så den ikke læses som replik. */
+.bubble.reaction { background: #ffe6bf; color: #7a4a10; font-style: italic; letter-spacing: 0.2px; }
+.bubble.reaction::after { border-top-color: #ffe6bf; }
+
 .vector-panel { top: 150px; right: 16px; width: 420px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; gap: 6px; }
 .vector-panel .live { margin-left: 6px; color: #e8710a; text-transform: none; letter-spacing: 0; font-weight: 600; }
 .vector-panel .hint { font-size: 12px; }

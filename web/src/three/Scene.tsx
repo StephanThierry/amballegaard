@@ -10,7 +10,7 @@ import { Avatars } from './Avatars'
 import { Floors } from './Floors'
 import { Furniture } from './Furniture'
 import { facingSignature } from './layout'
-import { getMaterials } from './materials'
+import { getMaterials, variantsOf } from './materials'
 import { Openings } from './Openings'
 import { Roofs } from './Roofs'
 import { Site } from './Site'
@@ -34,6 +34,8 @@ export function Scene() {
     <Canvas shadows="percentage" orthographic dpr={levelDpr(level)}
       camera={{ position: [c.x + 40, 46, c.z + 40], zoom: 34, near: 0.1, far: 500 }}
       gl={{ antialias: false, powerPreference: 'high-performance' }}
+      // Lokale klippeplaner bruges af vægåbningerne, så døre og porte skæres over i lav væghøjde (se clip.tsx).
+      onCreated={({ gl }) => { gl.localClippingEnabled = true }}
       onPointerMissed={() => useStore.getState().set({ selectedAgent: null, followAgent: false })}>
       <World house={house} center={c} />
     </Canvas>
@@ -46,6 +48,7 @@ function World({ house, center }: { house: House; center: THREE.Vector3 }) {
   const q = QUALITY[useStore((s) => s.quality)]
   const ao = useRef<{ enabled: boolean } | null>(null)
   const camera = useThree((s) => s.camera)
+  const worldScene = useThree((s) => s.scene)
   const controls = useRef<CameraControls>(null)
   const [cam, setCam] = useState<P2>([0.707, 0.707])
   const sig = useRef('')
@@ -53,12 +56,13 @@ function World({ house, center }: { house: House; center: THREE.Vector3 }) {
   const placed = useRef(false)
   useEffect(() => {
     registerControls(controls.current)
-    if (import.meta.env.DEV) (window as unknown as { __cc: unknown }).__cc = controls.current
+    // Fejlsøgningsgreb: __cc stiller kameraet præcist, __scene gør det muligt at lede efter objekter.
+    if (import.meta.env.DEV) Object.assign(window, { __cc: controls.current, __scene: worldScene })
     // Kun første gang — ellers nulstilles kameraet hver gang Scene gengives (fx ved skift af værktøj).
     if (placed.current) return
     placed.current = true
     controls.current?.setLookAt(center.x + 40, 46, center.z + 40, center.x, 0, center.z, false)
-  }, [center])
+  }, [center, worldScene])
 
   // Opdater "hvilke vægge vender mod kameraet" kun når kvadranten skifter.
   useFrame(() => {
@@ -167,8 +171,11 @@ function Lighting({ house, center, q }: { house: House; center: THREE.Vector3; q
     for (const l of roomLights.current) if (l) l.intensity = 5 * night
     // Uden rumlys (lave niveauer) løftes himmellyset lidt om natten, så huset ikke bliver sort.
     if (hemi.current) hemi.current.intensity = 0.25 + (q.roomLights ? 0 : 0.9 * night)
-    mats.glass.emissive.copy(glassGlow)
-    mats.glass.emissiveIntensity = 0.9 * night
+    // Også de afskårne kloner af glasset (lav væghøjde), ellers gløder kun de uklippede ruder om natten.
+    for (const g of variantsOf(mats.glass)) {
+      g.emissive.copy(glassGlow)
+      g.emissiveIntensity = 0.9 * night
+    }
   })
 
   // Ny skyggetype eller -størrelse kræver et nyt skyggekort. Three genopbygger det kun når lyset

@@ -3,10 +3,10 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { toggleMower, useStore } from '../store'
-import { WallSwitch } from './Openings'
+import { Clickable } from './interact'
 
-/** Ladestationens placering (skal matche Mower.Dock i simulationen) og væggen bag den. */
-const DOCK = { x: 19.35, z: 17.6, wallX: 19.9 }
+/** Ladestationens placering (skal matche Mower.Dock i simulationen). */
+const DOCK = { x: 19.35, z: 17.6 }
 /** Terrassens vestkant: øst for den kører klipperen på fliser, vest for den på græsset (lidt lavere). */
 const TERRACE_EDGE_X = 12.46
 const TERRACE_Y = -0.055, LAWN_Y = -0.14
@@ -30,15 +30,18 @@ const mats = (() => {
   return () => (c ??= make())
 })()
 
+const INDICATOR_GREEN = new THREE.Color('#5fe08a')
+const INDICATOR_RED = new THREE.Color('#ff4d3d')
+
+/**
+ * Robotklipperen startes/stoppes ved klik — både på ladestationen og på selve robotten,
+ * så man kan ramme den uanset om den står i dokken eller er ude at køre.
+ */
 export function MowerAndDock() {
-  const on = useStore((s) => s.snapshot?.mower?.on ?? true)
   return (
     <group>
-      <Dock />
-      <RobotMower />
-      <group position={[DOCK.wallX - 0.007, 1.1, DOCK.z]} rotation={[0, -Math.PI / 2, 0]}>
-        <WallSwitch position={[0, 0, 0]} on={on} onToggle={() => toggleMower()} />
-      </group>
+      <Clickable onActivate={() => toggleMower()}><Dock /></Clickable>
+      <Clickable onActivate={() => toggleMower()}><RobotMower /></Clickable>
     </group>
   )
 }
@@ -66,7 +69,18 @@ function RobotMower() {
     g.position.copy(v.pos)
     g.rotation.y = v.heading
     wheels.current.forEach((w) => { if (w) w.rotation.x = v.roll })
-    m.charge.emissiveIntensity = s.state === 'charging' ? 1.5 + Math.sin(performance.now() / 400) : 0
+    // Indikatoren blinker grønt mens den aktivt klipper/kører ud, rødt når den kører hjem til stationen,
+    // og lyser svagt og fast grønt mens den lader i dokken.
+    if (s.state === 'mowing' || s.state === 'leaving') {
+      m.charge.emissive.copy(INDICATOR_GREEN)
+      m.charge.emissiveIntensity = 1.3 + Math.sin(performance.now() / 220) * 1.1
+    } else if (s.state === 'returning') {
+      m.charge.emissive.copy(INDICATOR_RED)
+      m.charge.emissiveIntensity = 1.3 + Math.sin(performance.now() / 220) * 1.1
+    } else {
+      m.charge.emissive.copy(INDICATOR_GREEN)
+      m.charge.emissiveIntensity = 0.5
+    }
   })
   return (
     <group ref={root}>

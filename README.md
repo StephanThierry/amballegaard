@@ -36,12 +36,14 @@ Tests: `dotnet test`
 | Sti | Indhold |
 |---|---|
 | `data/furniture.json` | Alt inventar: id, navn, type, pos [x, z], rot i grader. Hot-reloades i browseren. |
-| `data/house.json` | Hele husets geometri i meter: vægge, åbninger, rum, tage, have. Aflæst fra plantegningen (70,4 px/m). |
+| `data/house.json` | Hele husets geometri i meter: vægge, åbninger, rum, tage, have. Aflæst fra plantegningen (70,4 px/m). Indlæses ved opstart — **genstart backenden** efter ændringer. |
 | `src/Amballegaard.Simulation` | Domænelogik uden web: husmodel, geometri, beboere, `World.Tick()` |
 | `src/Amballegaard.Server` | ASP.NET: `SimulationHost` (10 Hz tick, 5 Hz snapshots), `WorldHub` (SignalR), REST |
 | `web/src/three` | Rendering: vægge, tage, åbninger, møbler, have, avatarer, lys/sol |
 | `web/src/three/textures.ts` | Procedurale PBR-teksturer (tegl, klinker, fliser, tagpap, hæk) |
+| `web/src/three/show.ts` | Manuskript og afspilning for tv-shows (stand-up-specialen på stuens skærm) |
 | `web/public/assets` | CC0-assets fra Poly Haven (egeplank, græs, HDRI, møbler) |
+| `docs/3d-noter.md` | Arbejdsnoter til 3D-klienten: klik-mekanisme, afskæring i lave vægge, orientering i vægåbninger, tv-shows, faldgruber |
 
 ## Betjening
 
@@ -50,8 +52,15 @@ Tests: `dotnet test`
 - Klik på en beboer (eller i listen) for at vælge og følge med kameraet
 - **Træk en beboer** med venstre mus for at flytte den — den vandrer derefter i det rum (eller det sted i haven), hvor den blev sat
 - Beboerne siger tilfældige ting i talebobler (50 replikker i `src/Amballegaard.Simulation/Agents/Speech.cs`)
-- **Døre**: klik på en dør for at åbne/lukke den; beboerne åbner selv de døre de går igennem
-- **Garageportene** (ledporte der kører op og ind langs loftet) åbnes/lukkes med den lysende knap på indersiden ved hver port
+- **Klik på tingene**: alt der kan tændes/slukkes eller åbnes/lukkes betjenes ved at klikke direkte på selve objektet —
+  døre, garageporte, pejs, køleskab, ovn, fryser, toiletlåg, natlampe og robotplæneklipperen (klik på robotten *eller* ladestationen).
+  Der er ingen separate knapper eller kontakter. Nye klikbare objekter registreres med `<Clickable>` / `clickable()` i `web/src/three/interact.tsx`
+- **TV**: skærmene starter slukkede (rød standby-diode). Klik tænder dem — så ruller Streamberrys logo, og showet
+  fortsætter hvor man var kommet til. Stuens tv viser stand-up-specialen *Honorable Primate* med Tim Cardigan:
+  replikkerne kommer som talebobler fra tv'et, og regianvisninger som `[laughter]` og `[cheers and applause]`
+  får publikum på skærmen til at grine og klappe. Manuskript og afspilning: `web/src/three/show.ts`
+- **Døre**: beboerne åbner selv de døre de går igennem
+- **Garageportene** er ledporte, der kører op og ind langs loftet
 - **Grafik** (øverst til venstre): slider fra *Ydelse* til *Kvalitet* i fem trin (Minimal, Lav, Mellem, Høj, Ultra — se `web/src/three/quality.ts`).
   Ved første opstart på en GPU måles hardwaren, og niveauet sættes så scenen holder ~30 fps (gemmes lokalt; *Mål igen* gentager målingen).
   *Adaptiv ydelse* sænker opløsning, AO og skyggeopdatering mens kameraet bevæger sig og tegner alt i fuld kvalitet, når det står stille.

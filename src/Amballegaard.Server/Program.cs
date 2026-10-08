@@ -17,7 +17,13 @@ builder.Services.AddSignalR();
 var app = builder.Build();
 
 app.UseDefaultFiles();
-app.UseStaticFiles();
+// 3D-assets som ASP.NET ikke kender — ukendte filtyper giver ellers 404, og så crasher scenen (HDRI, glTF-modeller).
+var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+contentTypes.Mappings[".hdr"] = "image/vnd.radiance";
+contentTypes.Mappings[".gltf"] = "model/gltf+json";
+contentTypes.Mappings[".glb"] = "model/gltf-binary";
+contentTypes.Mappings[".bin"] = "application/octet-stream";
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
 
 // Rå house.json sendes uændret, så klienten også får tag, have m.m. som simulationen ikke bruger.
 app.MapGet("/api/house", () => Results.File(housePath, "application/json"));
