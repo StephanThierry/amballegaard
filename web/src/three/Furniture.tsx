@@ -369,7 +369,10 @@ function Desk({ p, rot = 0, w = 1.2, game, chairColor, screenRot = 0, noScreen =
       {noScreen ? (
         <>
           <group position={[-0.15, 0.73, -0.12]}><ToddlerToys /></group>
-          <group position={[0.3, 0.73, 0.12]} rotation={[0, 0.4, 0]}><StageMic /></group>
+          {/* Mikrofonen ligger på siden (roteret 90° om Z i StageMic), så dens lodrette udstrækning
+              bliver den største radius (grillen, 0.021) — løftet op til bordpladens overside (0.745)
+              plus den radius, ellers stikker den gennem pladen. */}
+          <group position={[0.3, 0.766, 0.12]} rotation={[0, 0.4, 0]}><StageMic /></group>
         </>
       ) : (
         /* Skærmen drejes om sin egen fod, så to skærme på samme bord kan vinkles ind mod brugeren uden at overlappe. */
