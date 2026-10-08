@@ -163,6 +163,39 @@ public class HouseModelTests
     }
 
     [Fact]
+    public void Love_moment_lasts_at_least_15_seconds_and_pauses_chatter_after()
+    {
+        var world = new World(Load(), Family.Create(), seed: 11);
+        // Lisa står i stuen, så Stephan trækkes direkte hen til hende — udløser kys-øjeblikket med det samme
+        // (samme punkt som "maxemil" bruger til "stuen" i Drop_on_a_wall_lands_beside_it_inside_a_room et al).
+        Assert.True(world.MoveAgent("lisa", new Vec2(17.8, 11.8)));
+        Assert.True(world.MoveAgent("stephan", new Vec2(17.8, 11.8)));
+
+        var stephan = world.Agents.Single(a => a.Id == "stephan");
+        var lisa = world.Agents.Single(a => a.Id == "lisa");
+        Assert.True(stephan.InLoveMeeting);
+        Assert.True(lisa.InLoveMeeting);
+
+        // LoveEffect sættes først når StepLove behandler den første replik, så tjek den efter første Tick.
+        var together = 0.0;
+        var sawEffect = false;
+        do
+        {
+            world.Tick(0.1);
+            together += 0.1;
+            sawEffect |= world.LoveEffect is not null;
+            Assert.True(together < 30, "kærligheds-øjeblikket sluttede aldrig");
+        } while (world.LoveEffect is not null);
+
+        Assert.True(sawEffect, "LoveEffect blev aldrig sat");
+        Assert.True(together >= 15, $"stod kun tæt sammen i {together:0.0}s, skal være mindst 15");
+        Assert.False(stephan.InLoveMeeting);
+        Assert.False(lisa.InLoveMeeting);
+        Assert.True(stephan.NextSpeechIn >= 20);
+        Assert.True(lisa.NextSpeechIn >= 20);
+    }
+
+    [Fact]
     public void Garage_door_toggles()
     {
         var world = new World(Load(), Family.Create());

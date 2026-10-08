@@ -1,5 +1,10 @@
+using System.Runtime.CompilerServices;
 using Amballegaard.Simulation.Agents;
 using Amballegaard.Simulation.House;
+
+// Lader testprojektet tjekke internal tilstand (fx Agent.InLoveMeeting/NextSpeechIn) direkte i stedet for
+// kun at kunne observere via de offentlige snapshot-felter.
+[assembly: InternalsVisibleTo("Amballegaard.Simulation.Tests")]
 
 namespace Amballegaard.Simulation;
 
@@ -13,6 +18,11 @@ public sealed class World
     private const double WallClearance = 0.3;
     /// <summary>Hvor tæt på (m) en beboer skal være en dør på sin rute, før den åbnes — og hvor langt efter den lukkes.</summary>
     private const double DoorOpenAhead = 1.2, DoorCloseBehind = 0.9;
+    /// <summary>Stephan og Lisa bliver stående tæt sammen mindst så længe, uanset hvor kort replikudvekslingen er.</summary>
+    private const double LoveTogetherMinSeconds = 15;
+    /// <summary>Efter et kærligheds-øjeblik går der mindst så lang tid, før en af dem siger noget tilfældigt igen —
+    /// ellers kan en hverdagsreplik ("Har du husket madpakken?") overlappe med kys-stemningen lige bagefter.</summary>
+    private const double LovePostPauseSeconds = 20;
 
     private readonly Random _rng;
     private readonly List<Agent> _agents;
@@ -26,6 +36,7 @@ public sealed class World
     private LovePhase _lovePhase = LovePhase.None;
     private double _loveCooldown;
     private double _loveTogetherTimer;
+    private double _loveTogetherElapsed;
     private int _loveLineIndex;
     private LoveScript? _loveScript;
     private string? _loveEffectKind;
@@ -161,6 +172,7 @@ public sealed class World
         _loveScript = new LoveScript([new LoveLine(resident.Id, text)], EndsWithKiss: true);
         _loveLineIndex = 0;
         _loveTogetherTimer = 0;
+        _loveTogetherElapsed = 0;
         _lovePhase = LovePhase.Together;
     }
 
@@ -349,22 +361,33 @@ public sealed class World
             lisa.Heading = Math.Atan2(-toLisa.X, -toLisa.Z);
             _loveEffectKind = "heart";
             _loveTogetherTimer = 0;
+            _loveTogetherElapsed = 0;
             _lovePhase = LovePhase.Together;
             return;
         }
 
         // Together: skridt gennem replikkerne med en lille pause imellem, så en sidste "hale" med
-        // hjertet/kysset synligt uden tale, og slip dem så tilbage til den normale vandre-AI.
+        // hjertet/kysset synligt uden tale, og slip dem så tilbage til den normale vandre-AI. De bliver
+        // stående mindst LoveTogetherMinSeconds, uanset hvor kort replikudvekslingen er.
         if (_loveScript is null) { _lovePhase = LovePhase.None; return; }
+        _loveTogetherElapsed += dt;
         _loveTogetherTimer -= dt;
         if (_loveTogetherTimer > 0) return;
 
         if (_loveLineIndex > _loveScript.Lines.Count)
         {
+            if (_loveTogetherElapsed < LoveTogetherMinSeconds)
+            {
+                _loveTogetherTimer = LoveTogetherMinSeconds - _loveTogetherElapsed;
+                return;
+            }
             stephan.InLoveMeeting = false;
             lisa.InLoveMeeting = false;
             stephan.IdleSeconds = 1 + _rng.NextDouble() * 2;
             lisa.IdleSeconds = 1 + _rng.NextDouble() * 2;
+            // Ingen tilfældig snak fra nogen af dem lige efter — ellers overlapper det med kys-stemningen.
+            stephan.NextSpeechIn = Math.Max(stephan.NextSpeechIn, LovePostPauseSeconds);
+            lisa.NextSpeechIn = Math.Max(lisa.NextSpeechIn, LovePostPauseSeconds);
             _lovePhase = LovePhase.None;
             _loveScript = null;
             _loveEffectKind = null;
