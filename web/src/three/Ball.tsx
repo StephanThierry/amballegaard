@@ -9,7 +9,7 @@ import { isOnLawn } from './layout'
 
 const RADIUS = 0.12
 const GRAVITY = 9.8
-const LIFT = 2.0
+const LIFT = 1.5
 
 let ballTexture: THREE.CanvasTexture | null = null
 
@@ -115,7 +115,9 @@ export function Basketball({ pos }: { pos: [number, number] }) {
   const lift = useRef<THREE.Group>(null)
   const roll = useRef<THREE.Group>(null)
   const raycaster = useMemo(() => new THREE.Raycaster(), [])
-  const groundPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), [])
+  // Mens man trækker bolden, rayCastes der mod et plan i selve løfte-højden (ikke mod gulvet) — ellers
+  // peger musen på gulvpunktet, mens bolden tegnes 1,5 m højere oppe, og de to driver visuelt fra hinanden.
+  const dragPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -LIFT), [])
   const s = useRef({
     x: pos[0], z: pos[1], y: RADIUS,
     vx: 0, vz: 0, vy: 0,
@@ -133,10 +135,10 @@ export function Basketball({ pos }: { pos: [number, number] }) {
 
     if (st.dragging) {
       raycaster.setFromCamera(frame.pointer, frame.camera)
-      if (raycaster.ray.intersectPlane(groundPlane, st.ground)) {
+      if (raycaster.ray.intersectPlane(dragPlane, st.ground)) {
         const [x, z] = resolve(house, st.ground.x, st.ground.z, RADIUS)
         st.x = x; st.z = z
-        st.y = RADIUS + LIFT
+        st.y = LIFT
         st.vx = 0; st.vz = 0; st.vy = 0
       }
     } else if (!st.settled) {
