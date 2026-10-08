@@ -149,7 +149,7 @@ public class HouseModelTests
     [Fact]
     public void Residents_talk_with_lines_that_fit_them()
     {
-        Assert.Equal(50, Speech.Lines.Count);
+        Assert.Equal(69, Speech.Lines.Count);
         var world = new World(Load(), Family.Create(), seed: 9);
         var heard = new HashSet<(string, string)>();
         for (var i = 0; i < 6000; i++)
@@ -160,6 +160,41 @@ public class HouseModelTests
         Assert.DoesNotContain(heard, h => h.Item1 == "hund"); // hunden er slået fra som standard
         Assert.DoesNotContain(heard, h => h.Item1 == "stephan" && h.Item2 == "Må jeg få noget slik?");
         Assert.DoesNotContain(heard, h => h.Item1 == "lisa" && h.Item2.Contains("bug"));
+    }
+
+    [Fact]
+    public void Conversation_starter_makes_the_other_resident_stop_and_answer()
+    {
+        // Max-Emil og Mathilde, ikke Stephan/Lisa, så kærligheds-øjeblikket ikke blander sig i samme rum.
+        var world = new World(Load(), Family.Create(), seed: 13);
+        Assert.True(world.MoveAgent("maxemil", new Vec2(17.8, 11.8))); // stuen
+        Assert.True(world.MoveAgent("mathilde", new Vec2(17.8, 11.8)));
+
+        var maxemil = world.Agents.Single(a => a.Id == "maxemil");
+        var mathilde = world.Agents.Single(a => a.Id == "mathilde");
+
+        SpeechLine? starterLine = null;
+        Agent? responder = null;
+        for (var i = 0; i < 20_000 && starterLine is null; i++)
+        {
+            world.Tick(0.1);
+            foreach (var (speaker, other) in new[] { (maxemil, mathilde), (mathilde, maxemil) })
+            {
+                if (speaker.Speech is null) continue;
+                var line = Speech.Conversations.FirstOrDefault(c => c.Text == speaker.Speech);
+                if (line is null) continue;
+                starterLine = line;
+                responder = other;
+                break;
+            }
+        }
+
+        Assert.NotNull(starterLine);
+        // Modparten er markeret som ventende på at svare (stoppet op), ikke bare tilfældigvis i gang med at sige noget selv.
+        Assert.NotNull(responder!.PendingResponseOptions);
+
+        for (var i = 0; i < 100 && responder.Speech is null; i++) world.Tick(0.1);
+        Assert.Contains(responder.Speech, starterLine!.Responses!);
     }
 
     [Fact]

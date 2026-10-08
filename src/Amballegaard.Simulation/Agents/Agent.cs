@@ -61,4 +61,10 @@ public sealed class Agent
     /// <summary>På vej til, eller står i, et "kærligheds-øjeblik" med en anden beboer (se <c>World.StepLove</c>).
     /// Mens dette er sat, overtager ikke den normale vandre-AI beboerens næste mål.</summary>
     internal bool InLoveMeeting { get; set; }
+
+    /// <summary>Sat når beboeren er blevet valgt som modpart i en samtale: venter <see cref="PendingResponseIn"/>
+    /// sekunder mere (til starterens replik er læst færdig), og svarer så med en tilfældig af disse. Mens
+    /// det står på, bliver beboeren stående i stedet for at vandre videre — se World.StepSpeech/StepWander.</summary>
+    internal IReadOnlyList<string>? PendingResponseOptions { get; set; }
+    internal double PendingResponseIn { get; set; }
 }

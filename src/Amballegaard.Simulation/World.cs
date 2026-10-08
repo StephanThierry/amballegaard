@@ -242,6 +242,18 @@ public sealed class World
 
     private void StepSpeech(Agent agent, double dt)
     {
+        // Venter på at svare på en samtale-starter: når starterens replik er læst færdig, svares der
+        // med en tilfældig af de forberedte svar. Egen tilfældig snak venter til bagefter.
+        if (agent.PendingResponseOptions is { } options)
+        {
+            agent.PendingResponseIn -= dt;
+            if (agent.PendingResponseIn <= 0)
+            {
+                Say(agent, options[_rng.Next(options.Count)]);
+                agent.PendingResponseOptions = null;
+            }
+            return;
+        }
         if (agent.Speech is not null)
         {
             agent.SpeechRemaining -= dt;
@@ -251,8 +263,30 @@ public sealed class World
         agent.NextSpeechIn -= dt;
         // Højst to snakker ad gangen, så det ikke bliver kaos. Under et kærligheds-øjeblik styrer
         // StepLove replikkerne alene, så den tilfældige snak blander sig ikke.
-        if (!agent.InLoveMeeting && agent.NextSpeechIn <= 0 && _agents.Count(a => a.Speech is not null) < 2)
-            Say(agent, Speech.Random(agent, _rng));
+        if (agent.InLoveMeeting || agent.NextSpeechIn > 0 || _agents.Count(a => a.Speech is not null) >= 2) return;
+
+        if (agent.Kind == AgentKind.Dog) { Say(agent, Speech.DogLines[_rng.Next(Speech.DogLines.Count)]); return; }
+
+        // Andre tilstedeværende i samme rum (aktive, ikke hunden, ikke midt i egen replik, allerede ved at
+        // skulle svare på noget andet, eller midt i et kærligheds-øjeblik) — kun med dem til stede kan en
+        // samtale-starter vælges.
+        var others = _agents.Where(a => a.Id != agent.Id && a.Active && a.Kind != AgentKind.Dog
+            && a.RoomId == agent.RoomId && a.Speech is null && a.PendingResponseOptions is null && !a.InLoveMeeting).ToList();
+
+        var pool = Speech.Lines.Where(l => l.Fits(agent)).ToList();
+        if (others.Count > 0) pool.AddRange(Speech.Conversations.Where(c => c.Fits(agent)));
+        if (pool.Count == 0) return;
+
+        var line = pool[_rng.Next(pool.Count)];
+        Say(agent, line.Text);
+        if (line.Responses is { } responses && others.Count > 0)
+        {
+            // Modparten stopper op med det samme og svarer, lige når starterens replik er færdig.
+            var responder = others[_rng.Next(others.Count)];
+            ClearPath(responder);
+            responder.PendingResponseOptions = responses;
+            responder.PendingResponseIn = agent.SpeechRemaining;
+        }
     }
 
     private void StepWander(Agent agent, double dt)
@@ -262,8 +296,8 @@ public sealed class World
             agent.IdleSeconds -= dt;
             agent.Activity = "idle";
             if (agent.IdleSeconds > 0) return;
-            // Under et kærligheds-øjeblik: bliv stående, StepLove bestemmer hvornår de slipper igen.
-            if (agent.InLoveMeeting) { agent.IdleSeconds = 0.4; return; }
+            // Under et kærligheds-øjeblik, eller mens man venter på at svare i en samtale: bliv stående.
+            if (agent.InLoveMeeting || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
             if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
             else agent.Target = NextWanderTarget(agent);
             if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
