@@ -478,6 +478,35 @@ function OfficeChair({ p, rot = 0, color }: { p: V3; rot?: number; color?: strin
   )
 }
 
+/**
+ * Sort sammenklappelig klaverskammel (model: typisk "keyboard bench"): polstret rektangulær sæde på ét
+ * X-stel set fra siden, med tværgående T-fødder for stabilitet. Lokalt: ingen fast retning.
+ */
+function PianoStool({ p, rot = 0 }: { p: V3; rot?: number }) {
+  const f = fm()
+  const pad = useMemo(() => new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.55 }), [])
+  const W = 0.42, D = 0.25, H = 0.49
+  const baseFront = 0.15, baseBack = -0.15, topY = H - 0.03, botY = 0.02
+  const legLen = Math.hypot(baseFront - baseBack, topY - botY)
+  const angle = Math.atan2(baseFront - baseBack, topY - botY)
+  const midY = (topY + botY) / 2
+  return (
+    <At p={p} rot={rot}>
+      <RoundedBox args={[W, 0.055, D]} radius={0.015} smoothness={2} position={[0, H, 0]} material={pad} castShadow receiveShadow />
+      <mesh material={f.blackSteel} position={[0, midY, 0]} rotation={[0, 0, angle]} castShadow><cylinderGeometry args={[0.011, 0.011, legLen, 8]} /></mesh>
+      <mesh material={f.blackSteel} position={[0, midY, 0]} rotation={[0, 0, -angle]} castShadow><cylinderGeometry args={[0.011, 0.011, legLen, 8]} /></mesh>
+      {/* Centrum-hængsel hvor benene krydser */}
+      <mesh material={f.blackSteel} position={[0, midY, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.016, 0.016, 0.03, 10]} /></mesh>
+      {/* T-fødder: tværgående rør ved begge bens gulvkontakt */}
+      {[baseFront, baseBack].map((x) => (
+        <mesh key={x} material={f.blackSteel} position={[x, botY, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.013, 0.013, D * 0.65, 8]} />
+        </mesh>
+      ))}
+    </At>
+  )
+}
+
 function Stool({ p }: { p: V3 }) {
   const f = fm()
   return (
@@ -2873,6 +2902,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'keyboard': return <Keyboard />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
+    case 'pianoStool': return <PianoStool p={O} />
     case 'toilet': return <Toilet id={it.id} />
     case 'vanity': return <Vanity p={O} w={it.w} bigMirror={it.bigMirror} />
     case 'showerNiche': return <ShowerNiche w={it.w} d={it.d} />
