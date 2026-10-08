@@ -1,7 +1,7 @@
 {
   "_doc": "Inventar. pos = [x, z] i meter i husets koordinatsystem (samme som house.json: x mod højre på plantegningen, z nedad). y = løft over gulv (default 0). rot = rotation om lodret akse i grader; 0 = møblets front vender mod +z (nedad på plantegningen), 90 = mod +x (højre), -90 = mod -x, 180 = mod -z. kind bestemmer hvordan møblet tegnes; 'model' bruger en glTF fra web/public/assets/models.",
   "items": [
-    {"id": "koekkenraekke", "name": "Køkkenrække med kogeplade", "room": "alrum", "kind": "kitchenRun", "pos": [11.33, 6.3], "rot": 90, "length": 3.4},
+    {"id": "koekkenraekke", "name": "Køkkenrække med kogeplade (forkortet, 30 cm luft til døren til Lisas værelse)", "room": "alrum", "kind": "kitchenRun", "pos": [11.33, 6.575], "rot": 90, "length": 2.85},
     {"id": "hoejskabe", "name": "Høje skabe: køleskab, 2× Siemens-ovn, fryser", "room": "alrum", "kind": "tallCabinets", "pos": [13.5, 3.66], "rot": 0, "w": 2.2},
     {"id": "koekkenoe", "name": "Køkkenø med vask", "room": "alrum", "kind": "kitchenIsland", "pos": [13.1, 6.1], "rot": 0},
     {"id": "taeppe-spisebord", "name": "Mørkegråt tæppe under spisebordet", "room": "alrum", "kind": "rug", "pos": [16.9, 6], "rot": 0, "w": 3.7, "d": 2.3, "color": "#1c1d1f"},
@@ -77,11 +77,11 @@
     {"id": "pc-mathilde", "name": "Mathildes PC (under skrivebordet)", "room": "vaerN", "kind": "pcTower", "pos": [17.85, 3.42], "rot": -90},
     {"id": "tastatur-mus-mathilde", "name": "Tastatur + mus (Mathilde)", "room": "vaerN", "kind": "keyboardMouse", "pos": [17.6, 3.1], "y": 0.745, "rot": -90, "color": "#ff5ca8"},
     {"id": "plante-mathilde", "name": "Lille plante (Mathildes skrivebord)", "room": "vaerN", "kind": "model", "model": "potted_plant_04", "pos": [17.88, 2.55], "y": 0.745},
-    {"id": "skrivebord-lisa", "name": "Lisas skrivebord (sort kontorstol, ekstra skærm)", "room": "vaerV", "kind": "desk", "pos": [9, 5.15], "rot": 180, "w": 1.4, "chairColor": "#141414"},
-    {"id": "skaerm-lisa-ekstra", "name": "Ekstra skærm (Lisas skrivebord)", "room": "vaerV", "kind": "monitors", "pos": [9.2, 5.3], "y": 0.73, "rot": 180, "count": 1},
+    {"id": "skrivebord-lisa", "name": "Lisas skrivebord (sort kontorstol, ekstra skærm)", "room": "vaerV", "kind": "desk", "pos": [9, 5.15], "rot": 180, "w": 1.4, "chairColor": "#141414", "screenRot": -13},
+    {"id": "skaerm-lisa-ekstra", "name": "Ekstra skærm (Lisas skrivebord, vinklet ind mod brugeren)", "room": "vaerV", "kind": "monitors", "pos": [9.35, 5.3], "y": 0.685, "rot": 193, "count": 1, "width": 0.5},
     {"id": "tastatur-mus-lisa", "name": "Tastatur + mus (Lisas skrivebord)", "room": "vaerV", "kind": "keyboardMouse", "pos": [9, 4.98], "y": 0.745, "rot": 180},
     {"id": "sovesofa-lisa", "name": "Grå sovesofa (østvæggen, 10% smallere)", "room": "vaerV", "kind": "sleeperSofa", "pos": [10.46, 6.87], "rot": -90, "w": 1.8, "d": 0.85, "color": "#7d8085"},
-    {"id": "skab-lisa", "name": "Sort skab med 2 låger (sølv ludo-knopper, midt mellem staffeli og skrivebord)", "room": "vaerV", "kind": "doubleCabinet", "pos": [8.71, 6.18], "rot": 90, "w": 0.9, "height": 1.8, "d": 0.45, "color": "#141416"},
+    {"id": "skab-lisa", "name": "Sort skab med 2 låger (sølv ludo-knopper, op ad vestvæggen mellem skrivebord og staffeli)", "room": "vaerV", "kind": "doubleCabinet", "pos": [8.025, 6.18], "rot": 90, "w": 0.9, "height": 1.8, "d": 0.45, "color": "#141416"},
     {"id": "staffeli-lisa", "name": "Staffeli med halvfærdigt abstrakt maleri", "room": "vaerV", "kind": "easel", "pos": [8.42, 7.21], "rot": 128},
     {"id": "skuffemoebel-lisa", "name": "Skuffemøbel, 50% smallere, drejet op ad vestvæggen", "room": "vaerV", "kind": "dresser", "pos": [8.025, 4.17], "rot": 90, "w": 0.4, "height": 1.2, "d": 0.45, "color": "#c9a67a", "fronts": "#c9a67a"},
     {"id": "bryggers-bord", "name": "Bryggersbord med vask", "room": "bryggers", "kind": "counter", "pos": [10.1, 1.84], "rot": 0, "length": 1.8},

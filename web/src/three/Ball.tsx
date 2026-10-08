@@ -9,7 +9,7 @@ import { isOnLawn } from './layout'
 
 const RADIUS = 0.12
 const GRAVITY = 9.8
-const LIFT = 0.32
+const LIFT = 2.0
 
 let ballTexture: THREE.CanvasTexture | null = null
 
@@ -136,6 +136,7 @@ export function Basketball({ pos }: { pos: [number, number] }) {
       if (raycaster.ray.intersectPlane(groundPlane, st.ground)) {
         const [x, z] = resolve(house, st.ground.x, st.ground.z, RADIUS)
         st.x = x; st.z = z
+        st.y = RADIUS + LIFT
         st.vx = 0; st.vz = 0; st.vy = 0
       }
     } else if (!st.settled) {
@@ -162,7 +163,7 @@ export function Basketball({ pos }: { pos: [number, number] }) {
 
     g.position.x = st.x
     g.position.z = st.z
-    lg.position.y = st.y + (st.dragging ? LIFT : 0)
+    lg.position.y = st.y
     const speed = Math.hypot(st.vx, st.vz)
     if (speed > 0.002 && roll.current) {
       const axis = new THREE.Vector3(-st.vz, 0, st.vx).normalize()

@@ -116,7 +116,10 @@
     { "id": "vaskemaskine-vask", "kind": "washerDoor", "standAt": [11.3, 1.6] },
     { "id": "vaskemaskine-toer", "kind": "dryerDoor", "standAt": [11.9, 1.6] },
     { "id": "sovesofa-lisa", "kind": "sofaBed", "standAt": [10.46, 6.87] },
-    { "id": "lys-badS", "kind": "ceilingLight", "standAt": [21.7, 11.4] }
+    { "id": "lys-badS", "kind": "ceilingLight", "standAt": [21.7, 11.4] },
+    { "id": "koekkenraekke", "kind": "stove", "standAt": [11.35, 6.5] },
+    { "id": "koekkenoe-vand", "kind": "tap", "standAt": [13.0, 5.9] },
+    { "id": "koekkenoe-opvask", "kind": "dishwasher", "standAt": [12.6, 5.7] }
   ],
 
   "roofs": [

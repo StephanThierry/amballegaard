@@ -236,7 +236,9 @@ function GameScreen({ kind, w, h, position }: { kind: string; w: number; h: numb
   return <mesh material={mat} position={position}><planeGeometry args={[w, h]} /></mesh>
 }
 
-function Desk({ p, rot = 0, w = 1.2, game, chairColor }: { p: V3; rot?: number; w?: number; game?: string; chairColor?: string }) {
+function Desk({ p, rot = 0, w = 1.2, game, chairColor, screenRot = 0 }: {
+  p: V3; rot?: number; w?: number; game?: string; chairColor?: string; screenRot?: number
+}) {
   const f = fm()
   return (
     <At p={p} rot={rot}>
@@ -244,9 +246,12 @@ function Desk({ p, rot = 0, w = 1.2, game, chairColor }: { p: V3; rot?: number; 
       {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
         <Box key={`${x}${z}`} p={[x * (w / 2 - 0.04), 0.36, z * 0.26]} s={[0.03, 0.72, 0.03]} m={f.blackSteel} />
       ))}
-      <Box p={[0.2, 0.95, -0.15]} s={[0.5, 0.32, 0.02]} m={f.screen} />
-      {game && <GameScreen kind={game} w={0.48} h={0.3} position={[0.2, 0.95, -0.1395]} />}
-      <Box p={[0.2, 0.78, -0.15]} s={[0.04, 0.12, 0.04]} m={f.blackSteel} />
+      {/* Skærmen drejes om sin egen fod, så to skærme på samme bord kan vinkles ind mod brugeren uden at overlappe. */}
+      <At p={[0.2, 0, -0.15]} rot={screenRot}>
+        <Box p={[0, 0.95, 0]} s={[0.5, 0.32, 0.02]} m={f.screen} />
+        {game && <GameScreen kind={game} w={0.48} h={0.3} position={[0, 0.95, 0.0105]} />}
+        <Box p={[0, 0.78, 0]} s={[0.04, 0.12, 0.04]} m={f.blackSteel} />
+      </At>
       <OfficeChair p={[0, 0, 0.55]} rot={Math.PI} color={chairColor} />
     </At>
   )
@@ -557,14 +562,96 @@ function WalkInShelves({ p, rot = 0, w }: { p: V3; rot?: number; w: number }) {
   )
 }
 
-function KitchenRun({ length }: { length: number }) {
+const STEAM_COUNT = 8
+type SteamPuff = { life: number; x: number; y: number; z: number; vx: number; vy: number; vz: number }
+const makeSteamPuff = (): SteamPuff => ({ life: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 })
+const steamGeometry = new THREE.SphereGeometry(0.035, 8, 6)
+const steamMaterial = new THREE.MeshStandardMaterial({ color: '#f2f2f2', roughness: 1, transparent: true, opacity: 0.4, depthWrite: false })
+
+/**
+ * Køkkenrække med induktionskomfur: 4 kogezoner, en rød diode der lyser så længe komfuret er tændt, og en
+ * gryde med vand på en af zonerne. Klik tænder/slukker — vandet koger og damper ca. 5 sek efter.
+ */
+function KitchenRun({ length, id }: { length: number; id?: string }) {
   const f = fm()
+  const on = useStore((s) => s.snapshot?.openDoors.includes(id ?? '') ?? false)
+  const diode = useMemo(() => new THREE.MeshStandardMaterial({ color: '#140404', emissive: '#ff2318', emissiveIntensity: 0 }), [])
+  diode.emissiveIntensity = on ? 2.4 : 0
+  const ringMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#0c0c0e', roughness: 0.3, metalness: 0.2 }), [])
+  const waterMat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#bfe0ee', roughness: 0.05, transparent: true, opacity: 0.7, depthWrite: false }), [])
+
+  const wasOn = useRef(false)
+  const onSince = useRef(0)
+  const steam = useRef<THREE.InstancedMesh>(null)
+  const steamState = useRef<SteamPuff[]>(Array.from({ length: STEAM_COUNT }, makeSteamPuff))
+  const steamNext = useRef(0)
+  const steamTimer = useRef(0)
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+
+  // Kogepladens centrum (matcher glaspladen) og de 4 zoners placering. Panden står på den bageste højre zone.
+  const cx = 0.04, cz = 0.02
+  const ringOffsets: [number, number][] = [[-0.14, -0.1], [0.14, -0.1], [-0.14, 0.1], [0.14, 0.1]]
+  const potOffset = ringOffsets[3]
+
+  useFrame((_, dt) => {
+    if (on && !wasOn.current) onSince.current = performance.now()
+    wasOn.current = on
+    const boiling = on && performance.now() - onSince.current > 5000
+
+    steamTimer.current -= dt
+    if (boiling && steamTimer.current <= 0) {
+      steamTimer.current = 0.12
+      const s = steamState.current[steamNext.current]
+      steamNext.current = (steamNext.current + 1) % STEAM_COUNT
+      s.life = 0.9 + Math.random() * 0.4
+      s.x = cx + potOffset[0] + (Math.random() - 0.5) * 0.03
+      s.z = cz + potOffset[1] + (Math.random() - 0.5) * 0.03
+      s.y = 0.98
+      s.vy = 0.35 + Math.random() * 0.15
+      s.vx = (Math.random() - 0.5) * 0.08
+      s.vz = (Math.random() - 0.5) * 0.08
+    }
+    if (steam.current) {
+      for (let i = 0; i < STEAM_COUNT; i++) {
+        const s = steamState.current[i]
+        if (s.life > 0) {
+          s.life -= dt
+          s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt
+          dummy.position.set(s.x, s.y, s.z)
+          dummy.scale.setScalar(0.4 + (1 - Math.max(0, Math.min(1, s.life))) * 0.8)
+        } else {
+          dummy.position.set(0, -5, 0)
+          dummy.scale.setScalar(0)
+        }
+        dummy.updateMatrix()
+        steam.current.setMatrixAt(i, dummy.matrix)
+      }
+      steam.current.instanceMatrix.needsUpdate = true
+    }
+  })
+
   // Lokalt: ryg mod væggen ved -z, front mod +z.
   return (
     <group>
       <Box p={[0, 0.44, 0]} s={[length, 0.88, 0.6]} m={f.white} />
       <Box p={[0, 0.9, 0]} s={[length + 0.02, 0.035, 0.63]} m={f.darkTop} />
-      <Box p={[0.04, 0.92, 0.02]} s={[0.6, 0.006, 0.52]} m={f.blackGlass} shadow={false} />
+      <Clickable onActivate={() => id && toggleDoor(id)} enabled={!!id}>
+        <Box p={[cx, 0.92, cz]} s={[0.6, 0.006, 0.52]} m={f.blackGlass} shadow={false} />
+        {ringOffsets.map(([dx, dz], i) => (
+          <mesh key={i} material={ringMat} position={[cx + dx, 0.924, cz + dz]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.075, 0.085, 28]} />
+          </mesh>
+        ))}
+        {/* Rød diode: lyser så længe komfuret er tændt */}
+        <mesh material={diode} position={[cx - 0.26, 0.924, cz + 0.22]}><boxGeometry args={[0.02, 0.004, 0.012]} /></mesh>
+        {/* Gryde med vand på den bageste højre zone */}
+        <group position={[cx + potOffset[0], 0.924, cz + potOffset[1]]}>
+          <mesh material={f.kettle} castShadow><cylinderGeometry args={[0.09, 0.085, 0.11, 24]} /></mesh>
+          <mesh material={waterMat} position={[0, 0.05, 0]}><cylinderGeometry args={[0.078, 0.078, 0.01, 24]} /></mesh>
+          <mesh material={f.steel} position={[0.1, 0.03, 0]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.006, 0.006, 0.05, 8]} /></mesh>
+        </group>
+      </Clickable>
+      <instancedMesh ref={steam} args={[steamGeometry, steamMaterial, STEAM_COUNT]} frustumCulled={false} />
     </group>
   )
 }
@@ -581,18 +668,84 @@ function Counter({ length }: { length: number }) {
 }
 
 
-function KitchenIsland() {
+/**
+ * Køkkenø: håndvask nedsænket som et rigtigt kar (centreret i øens bredde, samme afstand til begge kanter),
+ * med et høj blandingsbatteri der kan give vand ved klik, og en indbygget opvaskemaskine i venstre (nordlige)
+ * ende af den gangvendte side (-x), hængslet forneden så den vipper ned og ud når man klikker.
+ */
+function KitchenIsland({ id }: { id?: string }) {
   const f = fm()
-  // Håndvask mod -x (gangen mellem køkkenrækken og øen), med kant, nedsænket skål, afløb og høj blandingsbatteri.
-  const sinkX = -0.25, sinkZ = -0.4
+  const waterId = id ? `${id}-vand` : ''
+  const dishId = id ? `${id}-opvask` : ''
+  const waterOn = useStore((s) => s.snapshot?.openDoors.includes(waterId) ?? false)
+  const dishStep = useApplianceOpen(dishId)
+  const dishDoor = useRef<THREE.Group>(null)
+  useFrame((_, dt) => { if (dishDoor.current) dishDoor.current.rotation.z = dishStep(dt) * 1.4 })
+
+  const sinkX = 0, sinkZ = -0.4
+  const sinkW = 0.42, sinkD = 0.34, sinkDepth = 0.16
+  const sinkTopY = 0.92
+  const sinkGeo = useMemo(() => {
+    const outer = roundedRectShape(sinkW, sinkD, 0.025)
+    outer.holes.push(roundedRectShape(sinkW - 0.07, sinkD - 0.07, 0.015) as unknown as THREE.Path)
+    const shell = new THREE.ExtrudeGeometry(outer, { depth: sinkDepth, bevelEnabled: false })
+    shell.rotateX(Math.PI / 2)
+    const floor = new THREE.ShapeGeometry(roundedRectShape(sinkW - 0.12, sinkD - 0.12, 0.012), 16)
+    floor.rotateX(-Math.PI / 2)
+    return { shell, floor }
+  }, [])
+  const sinkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c7c9cb', roughness: 0.25, metalness: 0.6, side: THREE.DoubleSide }), [])
+  const waterMat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#bfe0ee', roughness: 0.05, transparent: true, opacity: 0.6, depthWrite: false }), [])
+  const sinkBottomY = sinkTopY - sinkDepth
+
+  // Bordpladen bygges som en ramme af 4 plader omkring vaskens hul, så skålen rent faktisk ses nedsænket
+  // i stedet for skjult under en massiv plade (samme hul-teknik som badekarret, blot som enkle kasser).
+  const holeX0 = sinkX - (sinkW - 0.04) / 2, holeX1 = sinkX + (sinkW - 0.04) / 2
+  const holeZ0 = sinkZ - (sinkD - 0.04) / 2, holeZ1 = sinkZ + (sinkD - 0.04) / 2
+  const topX0 = 0.08 - 1.25 / 2, topX1 = 0.08 + 1.25 / 2
+  const topZ0 = -1.15, topZ1 = 1.15
+
+  const dishZ = -0.78, dishW = 0.56, dishH = 0.72
+
   return (
     <group>
       <Box p={[0, 0.44, 0]} s={[1.0, 0.88, 2.2]} m={f.white} />
-      <Box p={[0.08, 0.9, 0]} s={[1.25, 0.04, 2.3]} m={f.stone} />
-      <RoundedBox args={[0.46, 0.022, 0.54]} radius={0.03} smoothness={2} position={[sinkX, 0.922, sinkZ]} material={f.steel} castShadow receiveShadow />
-      <Box p={[sinkX, 0.903, sinkZ]} s={[0.38, 0.012, 0.46]} m={f.blackSteel} shadow={false} />
-      <mesh material={f.blackGlass} position={[sinkX, 0.898, sinkZ]}><cylinderGeometry args={[0.018, 0.018, 0.01, 16]} /></mesh>
-      <mesh material={f.steel} position={[sinkX + 0.14, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
+      {/* Bordplade som ramme om vaskehullet (syd, nord, vest, øst) */}
+      <Box p={[0.08, 0.9, (holeZ1 + topZ1) / 2]} s={[1.25, 0.04, topZ1 - holeZ1]} m={f.stone} />
+      <Box p={[0.08, 0.9, (topZ0 + holeZ0) / 2]} s={[1.25, 0.04, holeZ0 - topZ0]} m={f.stone} />
+      <Box p={[(topX0 + holeX0) / 2, 0.9, (holeZ0 + holeZ1) / 2]} s={[holeX0 - topX0, 0.04, holeZ1 - holeZ0]} m={f.stone} />
+      <Box p={[(holeX1 + topX1) / 2, 0.9, (holeZ0 + holeZ1) / 2]} s={[topX1 - holeX1, 0.04, holeZ1 - holeZ0]} m={f.stone} />
+
+      {/* Håndvask: nedsænket skål, samme teknik som badekarret */}
+      <mesh geometry={sinkGeo.shell} material={sinkMat} position={[sinkX, sinkTopY, sinkZ]} />
+      <mesh geometry={sinkGeo.floor} material={sinkMat} position={[sinkX, sinkBottomY + 0.004, sinkZ]} />
+      <mesh material={f.blackGlass} position={[sinkX, sinkBottomY + 0.006, sinkZ]}><cylinderGeometry args={[0.018, 0.018, 0.006, 16]} /></mesh>
+      {waterOn && (
+        <>
+          <mesh material={waterMat} position={[sinkX + 0.1, sinkBottomY + sinkDepth * 0.5 - 0.02, sinkZ]}>
+            <cylinderGeometry args={[0.006, 0.006, sinkDepth * 0.7, 10]} />
+          </mesh>
+          <mesh material={waterMat} rotation={[-Math.PI / 2, 0, 0]} position={[sinkX, sinkBottomY + 0.01, sinkZ]}>
+            <circleGeometry args={[0.1, 16]} />
+          </mesh>
+        </>
+      )}
+
+      {/* Høj blandingsbatteri: klik tænder/slukker vandet */}
+      <Clickable onActivate={() => waterId && toggleDoor(waterId)} enabled={!!waterId}>
+        <mesh material={f.steel} position={[sinkX + 0.1, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
+        <mesh material={f.steel} position={[sinkX + 0.1, 1.24, sinkZ + 0.08]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.013, 0.013, 0.17, 8]} /></mesh>
+      </Clickable>
+
+      {/* Opvaskemaskine: indbygget i venstre (nordlige) ende, hængslet forneden — klik vipper lågen ned og ud */}
+      <group position={[-0.501, 0, dishZ]}>
+        <group ref={dishDoor} position={[0, 0.04, 0]} userData={{ dynamic: true }}>
+          <group {...(dishId ? toggleProps(dishId) : {})}>
+            <Box p={[0, dishH / 2, 0]} s={[0.022, dishH, dishW]} m={f.blackSteel} />
+            <Box p={[0.012, dishH - 0.07, 0]} s={[0.004, 0.018, dishW - 0.1]} m={f.steel} shadow={false} />
+          </group>
+        </group>
+      </group>
     </group>
   )
 }
@@ -2038,11 +2191,16 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
   const openT = useRef(0)
   const step = useApplianceOpen(id ?? '')
   const open = useStore((s) => s.snapshot?.openDoors.includes(id ?? '') ?? false)
+  // Udtræksmadrassens dybde og dens to endestillinger: lukket ligger den præcis oven i sædet (skjult,
+  // samme fodaftryk som sædet), åben glider den frem så liggefladen næsten fordobles.
+  const extHalf = (d - 0.1) / 2
+  const extClosedZ = -extHalf
+  const extOpenZ = d / 2
   useFrame((_, dt) => {
     const t = step(dt)
     openT.current = t
     if (back.current) back.current.rotation.x = t * (Math.PI / 2 - 0.03)
-    if (ext.current) ext.current.position.z = d / 2 - 0.02 + t * (d - 0.12)
+    if (ext.current) ext.current.position.z = extClosedZ + t * (extOpenZ - extClosedZ)
   })
   return (
     <Clickable onActivate={() => id && toggleDoor(id)} enabled={!!id}>
@@ -2051,10 +2209,10 @@ function SleeperSofa({ color = '#7d8085', w = 2.0, d = 0.85, id }: { color?: str
         {[-1, 1].map((s) => (
           <RoundedBox key={s} args={[inner / 2 - 0.01, 0.16, d - 0.2]} radius={0.06} smoothness={4} position={[s * inner / 4, 0.44, 0.08]} material={m} castShadow receiveShadow />
         ))}
-        {/* Udtræksmadras: skjult under sædet, glider frem og fordobler liggefladen når sofaen foldes ud */}
-        <group ref={ext} position={[0, 0, d / 2 - 0.02]}>
-          <RoundedBox args={[inner, 0.22, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.2, (d - 0.1) / 2]} material={m} castShadow receiveShadow />
-          {open && <Box p={[0, 0.33, (d - 0.1) / 2]} s={[inner - 0.06, 0.07, d - 0.22]} m={f.linen} />}
+        {/* Udtræksmadras: ligger skjult oven i sædet når den er lukket, og glider frem og fordobler liggefladen når sofaen foldes ud */}
+        <group ref={ext} position={[0, 0, extClosedZ]}>
+          <RoundedBox args={[inner, 0.22, d - 0.1]} radius={0.05} smoothness={3} position={[0, 0.2, extHalf]} material={m} castShadow receiveShadow />
+          {open && <Box p={[0, 0.33, extHalf]} s={[inner - 0.06, 0.07, d - 0.22]} m={f.linen} />}
         </group>
         {/* Rygpude: hængslet ved sædet, vipper fremad og ned i stedet for at stå op, når sofaen folder ud */}
         <group ref={back} position={[0, 0.36, -d / 2 + 0.02]}>
@@ -2407,6 +2565,8 @@ export interface FurnitureItem {
   chairColor?: string
   /** Delt tænd/sluk-id (fx flere loftspots der skal skifte samtidig). Falder tilbage til møblets eget id. */
   applianceId?: string
+  /** Skrivebord: drejer den indbyggede skærm om sin egen fod (grader), så to skærme kan vinkles ind mod brugeren. */
+  screenRot?: number
 }
 
 export const furnitureItems = (furnitureData as unknown as { items: FurnitureItem[] }).items
@@ -2426,7 +2586,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'roundTable': return <RoundTable d={it.w} color={it.color} />
     case 'bed': return <Bed p={O} w={it.w ?? 0.9} l={it.length} duvet={colorMat(it.duvet ?? '#d8cdb9')} duvetW={it.duvetW} plush={it.plush} squarePillows={it.squarePillows} />
     case 'wardrobe': return <Wardrobe p={O} w={it.w ?? 1} d={it.d} />
-    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} />
+    case 'desk': return <Desk p={O} w={it.w} game={it.games?.[0]} chairColor={it.chairColor} screenRot={((it.screenRot ?? 0) * Math.PI) / 180} />
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
     case 'toilet': return <Toilet id={it.id} />
@@ -2466,10 +2626,10 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'chaiseSofa': return <ChaiseSofa color={fabricColor(it, '#2340a8')} w={it.w} side={it.side} />
     case 'grill': return <Grill p={O} />
     case 'walkInShelves': return <WalkInShelves p={O} w={it.w ?? 1.8} />
-    case 'kitchenRun': return <KitchenRun length={it.length ?? 3} />
+    case 'kitchenRun': return <KitchenRun length={it.length ?? 3} id={it.id} />
     case 'counter': return <Counter length={it.length ?? 2} />
     case 'tallCabinets': return <KitchenTall w={it.w ?? 2.2} />
-    case 'kitchenIsland': return <KitchenIsland />
+    case 'kitchenIsland': return <KitchenIsland id={it.id} />
     case 'diningTable': return <DiningTable w={it.w ?? 2} d={it.d ?? 0.9} />
     case 'washerDryer': return <WasherDryer id={it.id} />
     case 'monitors': return <Monitors count={it.count ?? 1} size={it.width} layout={it.layout} games={it.games} />
