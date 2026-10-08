@@ -767,7 +767,7 @@ function KitchenIsland({ id }: { id?: string }) {
   const dishDoor = useRef<THREE.Group>(null)
   useFrame((_, dt) => { if (dishDoor.current) dishDoor.current.rotation.z = dishStep(dt) * 1.4 })
 
-  const sinkX = 0, sinkZ = -0.4
+  const sinkX = -0.26, sinkZ = -0.4
   const sinkW = 0.42, sinkD = 0.34, sinkDepth = 0.16
   const sinkTopY = 0.92
   const sinkGeo = useMemo(() => {
@@ -780,7 +780,7 @@ function KitchenIsland({ id }: { id?: string }) {
     return { shell, floor }
   }, [])
   const sinkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c7c9cb', roughness: 0.25, metalness: 0.6, side: THREE.DoubleSide }), [])
-  const waterMat = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#bfe0ee', roughness: 0.05, transparent: true, opacity: 0.6, depthWrite: false }), [])
+  const waterMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#1f6fb0', roughness: 1, metalness: 0, side: THREE.DoubleSide }), [])
   const sinkBottomY = sinkTopY - sinkDepth
 
   // Bordpladen bygges som en ramme af 4 plader omkring vaskens hul, så skålen rent faktisk ses nedsænket
@@ -806,20 +806,20 @@ function KitchenIsland({ id }: { id?: string }) {
       <mesh geometry={sinkGeo.floor} material={sinkMat} position={[sinkX, sinkBottomY + 0.004, sinkZ]} />
       <mesh material={f.blackGlass} position={[sinkX, sinkBottomY + 0.006, sinkZ]}><cylinderGeometry args={[0.018, 0.018, 0.006, 16]} /></mesh>
       {waterOn && (
-        <>
-          <mesh material={waterMat} position={[sinkX + 0.1, sinkBottomY + sinkDepth * 0.5 - 0.02, sinkZ]}>
+        <group userData={{ dynamic: true }}>
+          <mesh material={waterMat} position={[sinkX, sinkBottomY + sinkDepth * 0.5 - 0.02, sinkZ]}>
             <cylinderGeometry args={[0.006, 0.006, sinkDepth * 0.7, 10]} />
           </mesh>
           <mesh material={waterMat} rotation={[-Math.PI / 2, 0, 0]} position={[sinkX, sinkBottomY + 0.01, sinkZ]}>
             <circleGeometry args={[0.1, 16]} />
           </mesh>
-        </>
+        </group>
       )}
 
-      {/* Høj blandingsbatteri: klik tænder/slukker vandet */}
+      {/* Høj blandingsbatteri: klik tænder/slukker vandet. Tuden rækker fra stangen ind over vaskens midte. */}
       <Clickable onActivate={() => waterId && toggleDoor(waterId)} enabled={!!waterId}>
         <mesh material={f.steel} position={[sinkX + 0.1, 1.08, sinkZ]} castShadow><cylinderGeometry args={[0.015, 0.015, 0.34, 8]} /></mesh>
-        <mesh material={f.steel} position={[sinkX + 0.1, 1.24, sinkZ + 0.08]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.013, 0.013, 0.17, 8]} /></mesh>
+        <mesh material={f.steel} position={[sinkX + 0.0125, 1.24, sinkZ]} rotation={[0, 0, Math.PI / 2]}><cylinderGeometry args={[0.013, 0.013, 0.175, 8]} /></mesh>
       </Clickable>
 
       {/* Opvaskemaskine: indbygget i venstre (nordlige) ende, hængslet forneden — klik vipper lågen ned og ud */}

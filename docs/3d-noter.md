@@ -210,6 +210,12 @@ dotnet test                    # 27 tests, kun .NET-siden
   filer; det mønster væltede en indlæsning her. Kald funktionen direkte på brugsstedet.
 - Scenen er typisk 20–30 sekunder om at komme op (teksturer, HDRI, glTF). `window.__cc` findes først
   derefter — poll på den i stedet for at konkludere at noget er gået galt.
+- **Tone mapping findes kun inde i `EffectComposer`** (`Scene.tsx`, `<ToneMapping mode={ACES_FILMIC}>`),
+  som kun monteres når `post: true` i `quality.ts`. Ved `Minimal`/`Lav` (`post:false`) kører rendereren
+  altså helt uden tone mapping — stærkt oplyste/skinnende flader kan klippe til hvid, og farver på dem
+  kan være svære eller umulige at se på et screenshot. Ser noget "forsvundet" (fx farvet vand, en lille
+  diode) ud som ren hvid/overeksponeret flade ved lav grafikkvalitet, så prøv `Mellem` eller højere, før
+  du antager en render-fejl i koden.
 
 **Visuel verifikation i browseren** (Claude in Chrome)
 
