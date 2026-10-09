@@ -279,9 +279,14 @@ baglæns"). Erstattes af:
   høje multiplikatorer (60×/300×/1200×, "spol dagen hurtigt frem mens avatarerne går normalt") giver
   ikke mening længere, for der er nu et separat værktøj til at springe i tid (næste punkt).
 - **-30 min / +30 min** — ny, **relativ** tidsforskydning, i modsætning til dagens absolutte,
-  kun-fremad `JumpToTimeOfDay`. `-30 min` kræver at `SimTime` reelt kan **gå baglæns** — det bryder
-  eksplicit med den nuværende invariant og skal ændres i `World.cs`, ikke kun i klienten. Kræver
-  formentlig en ny RPC, fx `ShiftTime(minutes)` (kan være negativ), adskilt fra `JumpToTimeOfDay`.
+  kun-fremad `JumpToTimeOfDay`. **Præcisering**: `-30 min` er ikke en vedvarende baglæns-kørende
+  klokke — det er præcis samme mekanik som `JumpToTimeOfDay` allerede bruger i dag (ét diskret
+  "sæt `SimTime` til denne værdi"-øjeblik), bare uden fremad-kun-klampen (`if (target <= SimTime)
+  target += 1 dag`). Lige efter springet tikker `SimTime` videre fremad som altid, med den
+  aktuelle `TimeScale`. Det betyder der **ikke** er noget "spol simuleringen baglæns"-problem at
+  løse (ingen RNG-reversering, ingen vedvarende retning at holde styr på) — kun selve øjeblikket
+  hvor den nye værdi er lavere end den gamle. Kræver formentlig en ny RPC, fx `ShiftTime(minutes)`
+  (kan være negativ), adskilt fra `JumpToTimeOfDay`.
 
 **Åbent**: bevares "Spring til solopgang/solnedgang"? De har i dag præcis det samme problem som
 ±30 min-knapperne skal løse (abrupt tidsspring efterlader avatarerne i en forældet tilstand) — hvis
