@@ -151,28 +151,73 @@ runtime-bogføring (`(person, id, dato) → pending/active/done`), ikke noget de
 - Enhver `oncomplete`/`waitFor`-reference til `(person, id)` skal eksistere.
 - Grafen skal være **cyklefri** inden for én kørsel.
 - `goto`-mål (rum-id, person-id, punkt-id) og `interact`-mål (appliance-/dør-id) skal eksistere i
-  `house.json`/familien.
+  **ID-indekset** (afsnit 9.2) — det er loaderens ene kilde til sandhed for gyldige id'er, ikke en
+  selvstændig genimplementeret liste oven i `house.json`/familien.
 - To `trigger: time`-noder for samme person på samme klokkeslæt er formentlig en fejl — bør flages.
 - Hvert event-node-dokument bør bære et `schemaVersion`-felt, så motoren kan afvise filer skrevet
   mod en forældet spec i stedet for at mistolke dem stille.
 
-## 9. `.md`-spec til LLM-forfatning (separat fil — skal skrives når motoren findes)
+## 9. Dokumentation til LLM-forfatning: spec-fil + ID-indeks
 
-Denne plan er arkitekturen. Selve kontrakten en fremtidig LLM-session skriver nye event-filer ud
-fra, skal være en separat, udtømmende fil (fx `docs/dagsplan-events-spec.md`), der mindst
-indeholder:
+To artefakter skal findes, før en **uafhængig** LLM-session (uden adgang til at læse C#-koden eller
+hele `house.json`) kan planlægge og skrive et nyt event-forløb ved kun at kende disse to dokumenter.
 
-- Fil-placering/navngivning, og `schemaVersion`.
-- Det fulde handlingsvokabular (afsnit 4) med felter og gyldige værdier.
-- Adresseringsnøglen `(person, id)` og hvordan `oncomplete`/`waitFor` bruges.
-- Hvilke rum-/person-/punkt-/appliance-id'er der findes (pointer til at slå op i `house.json`),
-  inkl. advarsel om pladstrængsel i små rum (`badN`).
-- 2-3 fuldt udfoldede eksempelfiler som skabelon (se afsnit 10).
-- Eksplicit: ingen tvungen kæde-gennemførsel (afsnit 6), ingen implicit gentagelse uden om `chore`
-  (afsnit 4), `setState` er øjeblikkelig.
-- En konkret verifikationskommando en LLM skal køre efter at have tilføjet/ændret en fil (del af
-  `dotnet test`, eller en dedikeret valideringsrute), jf. CLAUDE.md's regel om at køre `dotnet test`
-  efter ændringer i `house.json`.
+### 9.1 `docs/dagsplan-events-spec.md` — modellen: typer, actions, fremgangsmåde
+
+Denne plan (nærværende fil) er arkitektur-beslutningsloggen. Spec-filen er den separate,
+udtømmende **kontrakt** en LLM skriver event-filer ud fra, og skal dække præcis tre ting:
+
+- **Typer** — de to triggertyper (afsnit 3.1): `time` (rod/indgang, rearmes hver simulerede dag) og
+  `passive` (kører kun via `oncomplete`), samt det valgfrie `waitFor`-fan-in-felt (afsnit 3.2).
+  Eksplicit: ingen to `time`-noder for samme person på samme klokkeslæt; en `passive`-node uden
+  nogen der peger på den er en fejl.
+- **Actions** — det fulde handlingsvokabular (afsnit 4): `goto`/`speak`/`wait`/`setState`/
+  `interact`/`chore`, med felter, gyldige værdier og "færdig"-semantik for hver — inkl. at
+  `goto(kind:person)` er dynamisk mens `goto(kind:room|point)` er statisk, at `setState` er
+  øjeblikkelig, og at `chore` er den foretrukne måde at udtrykke gentagne bevægelser på i stedet for
+  literal nodeudrulning.
+- **Fremgangsmåde** — den skridt-for-skridt metodologi en LLM skal følge, ikke kun en
+  referenceliste:
+  1. Slå gyldige id'er op i ID-indekset (9.2) — opfind aldrig et id, og brug aldrig rå koordinater
+     hvor et navngivet punkt findes.
+  2. Placér nye noder i **aktørens egen** `data/events/<person>.json` — tidstriggede noder er den
+     persons dagsplan, så et nyt forløb skal passe ind uden at kollidere med personens
+     eksisterende tidstriggede noder.
+  3. Wire `oncomplete`/`waitFor` på tværs af personers filer via `(person, id)`-par.
+  4. Kør valideringskommandoen (del af `dotnet test`, afsnit 8) og ret orphan-noder, dangling
+     referencer og cykler før forløbet anses for færdigt.
+  5. Hvis forløbet bruger jitrede varigheder (`wait`/`chore`): husk determinisme-kravet fra afsnit
+     13.3, ellers bryder tidsforskydnings-resolve.
+
+Indeholder desuden `schemaVersion`-feltet (afsnit 8), 2-3 fuldt udfoldede eksempelfiler som
+skabelon (afsnit 10), advarsel om pladstrængsel i små rum (`badN`), og den eksplicitte regel om
+ingen tvungen kæde-gennemførsel (afsnit 6).
+
+### 9.2 ID-indeks — ét lokalt opslagsfil for alle gyldige id'er
+
+For at en LLM kan skrive et nyt forløb **uden** at læse `house.json` (vægge/tage/have — primært
+irrelevant for event-forfatning) eller C#-koden, skal der findes **ét** samlet, curated
+opslagsfil, fx `data/events/index.json`, med alle id'er en event-fil kan referere til:
+
+```
+{
+  "rooms":   [ { "id": "badN", "name": "Badeværelse" }, ... ],
+  "persons": [ { "id": "maxemil", "name": "Max-Emil", "kind": "Child", "homeRoomId": "v2" }, ... ],
+  "points":  [ { "id": "koekkenoe-opvask", "kind": "dishwasher", "roomId": "koekken" }, ... ]
+}
+```
+
+- **Genereres, skrives ikke i hånden.** Vedligeholdes den manuelt ved siden af `house.json`/
+  `Family.cs`, går den før eller siden ud af sync — samme risiko CLAUDE.md allerede advarer om
+  mellem `house.json` og `/api/house`. Den skal i stedet **afledes automatisk** af de autoritative
+  kilder (`house.json`s `rooms`/`appliances`/relevante `openings`, og `Family.cs`s agent-liste), ikke
+  skrives som en selvstændig, parallel kilde til sandhed.
+- **Hot vs. genstart**: bør følge `house.json`s regel (genstart nødvendig, da den afledes af samme
+  kilde), medmindre den genereres on-demand ved hvert opslag/API-kald — i så fald er den altid frisk
+  uden separat genstarts-overvejelse. Afklares ved implementering.
+- **Samme fil bruges til validering** (afsnit 8): loaderens eksistens-tjek af `goto`-/
+  `interact`-mål slår op i præcis dette indeks — én kilde til sandhed for "hvilke id'er er gyldige",
+  delt mellem LLM-forfatning og motorens egen validering.
 
 ## 10. Udfoldede eksempler (til brug i spec-filen)
 
@@ -237,27 +282,30 @@ udfoldet her; skal færdiggøres ved implementering.)
 
 ## 12. Foreslået implementeringsrækkefølge
 
-1. `EventNode`-model + loader (mappe-scan af `data/events/*.json`, hot-reload, validering jf.
-   afsnit 8) — ingen ny agent-adfærd endnu, bare data ind og valideret.
-2. Klokkeslæt-trigger (krydsningstjek, daglig rearming, robust over for `TimeScale`/`Paused`/
+1. **ID-indeks-generator** (afsnit 9.2): aflæs `house.json`/`Family.cs` og skriv
+   `data/events/index.json`. Skal findes **før** loaderen, da dens validering (næste trin) bruger
+   indekset som kilde til sandhed.
+2. `EventNode`-model + loader (mappe-scan af `data/events/*.json`, hot-reload, validering jf.
+   afsnit 8 mod ID-indekset) — ingen ny agent-adfærd endnu, bare data ind og valideret.
+3. Klokkeslæt-trigger (krydsningstjek, daglig rearming, robust over for `TimeScale`/`Paused`/
    `JumpToTimeOfDay`) som selvstændig, testet byggesten.
-3. Generisk node-afvikling for `goto`/`speak`/`wait`/`setState` (dækker `wakeup`, som er simplere:
+4. Generisk node-afvikling for `goto`/`speak`/`wait`/`setState` (dækker `wakeup`, som er simplere:
    ét samlingspunkt i køkkenet, intet pladsproblem).
-4. Udvid med `interact`/`chore` (dækker opvaskemaskine-eksemplet og lignende huslige gøremål).
-5. Implementér `tobed` fuldt ud (sværere: forgrenet børn/voksne-logik, lille badeværelse,
+5. Udvid med `interact`/`chore` (dækker opvaskemaskine-eksemplet og lignende huslige gøremål).
+6. Implementér `tobed` fuldt ud (sværere: forgrenet børn/voksne-logik, lille badeværelse,
    efterfølgende søvntilstand til variabelt vågn-tidspunkt).
-6. Skriv `docs/dagsplan-events-spec.md` (afsnit 9) sideløbende med trin 1-5 — specen *er* kontrakten
-   for loaderen, så de skal udvikles sammen, ikke specen bagefter.
-7. Klient-animationer/poser for de nye `Activity`-værdier (`sleeping`, `tidying`, …) kan komme
+7. Skriv `docs/dagsplan-events-spec.md` (afsnit 9.1) sideløbende med trin 1-6 — specen *er*
+   kontrakten for loaderen, så de skal udvikles sammen, ikke specen bagefter.
+8. Klient-animationer/poser for de nye `Activity`-værdier (`sleeping`, `tidying`, …) kan komme
    sidst — kan vises som stillestående i den rigtige position/pose, indtil riggede avatarer
    (sidste del af Fase 4, jf. README) er klar.
-8. Test-strategi, jf. eksisterende `dotnet test`-mønster (husmodel, drag/drop, porte, talebobler):
+9. Test-strategi, jf. eksisterende `dotnet test`-mønster (husmodel, drag/drop, porte, talebobler):
    dæk (a) at et event udløses præcis én gang/dag, også ved høj `TimeScale` og efter
    `JumpToTimeOfDay`, (b) at alle deltagere ender rigtigt sted med rigtig `Activity`, (c) at en
    bruger-afbrydelse (drag/`SetActive`) midt i et event rydder op uden at nogen sidder fast.
-9. Tidspanel-UI og tidsforskydning med resolve (afsnit 13) — separat delopgave, kan komme efter
-   trin 1-5 er på plads, da resolve-mekanismen forudsætter at event-grafen og dens varigheder
-   allerede findes.
+10. Tidspanel-UI og tidsforskydning med resolve (afsnit 13) — separat delopgave, kan komme efter
+    trin 1-6 er på plads, da resolve-mekanismen forudsætter at event-grafen og dens varigheder
+    allerede findes.
 
 ## 13. Tidspanel-UI og tidsforskydning (resolve-on-jump)
 
