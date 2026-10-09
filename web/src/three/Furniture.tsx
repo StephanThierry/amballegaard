@@ -1107,10 +1107,10 @@ function WasherDryerUnit({ x, dryer, id, W, D, base, H }: {
   const f = fm()
   const door = useRef<THREE.Group>(null)
   const step = useApplianceOpen(id ?? '')
-  // Vaskemaskinen hængsler i venstre side (åbner mod -x), tørretumbleren i højre (åbner mod +x), så lågerne ikke mødes.
-  const hinge = dryer ? 1 : -1
+  // Begge låger hængsler i højre side og svinger ud i 120° (ikke 90°) — ægte hængsel-sving, ingen glidning.
   const R = 0.19
-  useFrame((_, dt) => { if (door.current) door.current.rotation.y = step(dt) * hinge * -1.7 })
+  const OPEN_ANGLE = (120 * Math.PI) / 180
+  useFrame((_, dt) => { if (door.current) door.current.rotation.y = -step(dt) * OPEN_ANGLE })
   return (
     <group position={[x, 0, 0]}>
       {/* Sokkel med to skuffer */}
@@ -1130,12 +1130,12 @@ function WasherDryerUnit({ x, dryer, id, W, D, base, H }: {
       <mesh material={f.blackSteel} position={[0, base + H * 0.42, D / 2 + 0.004]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.165, 0.165, 0.01, 32]} /></mesh>
       {/* Rund luge: hængslet i yderkanten, klik åbner/lukker den. Vaskemaskinens låge er hvid med en dyb
           grove forneden som håndtag; tørretumblerens beholder den stålgrå ramme. */}
-      <group ref={door} position={[hinge * R, base + H * 0.42, D / 2 + 0.006]} userData={{ dynamic: true }}>
+      <group ref={door} position={[R, base + H * 0.42, D / 2 + 0.006]} userData={{ dynamic: true }}>
         <group {...(id ? toggleProps(id) : {})}>
-          <mesh material={dryer ? f.steel : f.white} position={[hinge * -R, 0, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
-          <mesh material={dryer ? f.screen : f.blackGlass} position={[hinge * -R, 0, 0.007]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.155, 0.155, 0.006, 32]} /></mesh>
+          <mesh material={dryer ? f.steel : f.white} position={[-R, 0, 0]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.19, 0.19, 0.012, 32]} /></mesh>
+          <mesh material={dryer ? f.screen : f.blackGlass} position={[-R, 0, 0.007]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.155, 0.155, 0.006, 32]} /></mesh>
           {!dryer && (
-            <mesh material={f.blackSteel} position={[hinge * -R, -0.15, 0.007]} rotation={[0, 0, Math.PI / 2]}>
+            <mesh material={f.blackSteel} position={[-R, -0.15, 0.007]} rotation={[0, 0, Math.PI / 2]}>
               <capsuleGeometry args={[0.009, 0.05, 6, 10]} />
             </mesh>
           )}
