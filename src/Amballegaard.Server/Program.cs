@@ -1,15 +1,24 @@
 using Amballegaard.Server;
 using Amballegaard.Simulation;
 using Amballegaard.Simulation.Agents;
+using Amballegaard.Simulation.Events;
 using Amballegaard.Simulation.House;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var housePath = builder.Configuration["HouseFile"]
     ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "house.json"));
+var eventIndexPath = builder.Configuration["EventIndexFile"]
+    ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "events", "index.json"));
 
-builder.Services.AddSingleton(_ => HouseModel.Load(housePath));
-builder.Services.AddSingleton(sp => new World(sp.GetRequiredService<HouseModel>(), Family.Create()));
+var house = HouseModel.Load(housePath);
+var agents = Family.Create();
+// Dagsplan-motorens ID-indeks (docs/dagsplan-motor.md §9.2) regenereres ved hver opstart, så den
+// aldrig kan gå ud af sync med house.json/Family — ingen manuel vedligeholdelse nødvendig.
+EventIndexWriter.Write(house, agents, eventIndexPath);
+
+builder.Services.AddSingleton(house);
+builder.Services.AddSingleton(_ => new World(house, agents));
 builder.Services.AddSingleton<SimulationGate>();
 builder.Services.AddHostedService<SimulationHost>();
 builder.Services.AddSignalR();

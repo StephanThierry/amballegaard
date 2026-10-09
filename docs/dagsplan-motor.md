@@ -196,29 +196,34 @@ ingen tvungen kæde-gennemførsel (afsnit 6).
 
 ### 9.2 ID-indeks — ét lokalt opslagsfil for alle gyldige id'er
 
-For at en LLM kan skrive et nyt forløb **uden** at læse `house.json` (vægge/tage/have — primært
-irrelevant for event-forfatning) eller C#-koden, skal der findes **ét** samlet, curated
-opslagsfil, fx `data/events/index.json`, med alle id'er en event-fil kan referere til:
+**Status: implementeret** (2026-10-09, trin 1 i afsnit 12). For at en LLM kan skrive et nyt forløb
+**uden** at læse `house.json` (vægge/tage/have — primært irrelevant for event-forfatning) eller
+C#-koden, findes nu **ét** samlet, curated opslagsfil, `data/events/index.json`, med alle id'er en
+event-fil kan referere til:
 
 ```
 {
-  "rooms":   [ { "id": "badN", "name": "Lille badeværelse" }, ... ],
+  "rooms":   [ { "id": "badN", "name": "Badeværelse" }, ... ],
   "persons": [ { "id": "maxemil", "name": "Max-Emil", "kind": "Child", "homeRoomId": "v2" }, ... ],
   "points":  [ { "id": "koekkenoe-opvask", "kind": "dishwasher", "roomId": "koekken" }, ... ]
 }
 ```
 
-- **Genereres, skrives ikke i hånden.** Vedligeholdes den manuelt ved siden af `house.json`/
-  `Family.cs`, går den før eller siden ud af sync — samme risiko CLAUDE.md allerede advarer om
-  mellem `house.json` og `/api/house`. Den skal i stedet **afledes automatisk** af de autoritative
-  kilder (`house.json`s `rooms`/`appliances`/relevante `openings`, og `Family.cs`s agent-liste), ikke
-  skrives som en selvstændig, parallel kilde til sandhed.
-- **Hot vs. genstart**: bør følge `house.json`s regel (genstart nødvendig, da den afledes af samme
-  kilde), medmindre den genereres on-demand ved hvert opslag/API-kald — i så fald er den altid frisk
-  uden separat genstarts-overvejelse. Afklares ved implementering.
-- **Samme fil bruges til validering** (afsnit 8): loaderens eksistens-tjek af `goto`-/
-  `interact`-mål slår op i præcis dette indeks — én kilde til sandhed for "hvilke id'er er gyldige",
-  delt mellem LLM-forfatning og motorens egen validering.
+- **Implementering**: `src/Amballegaard.Simulation/Events/EventIndex.cs` — `EventIndexWriter.Build`
+  afleder strukturen af `HouseModel.Rooms`/`HouseModel.Appliances` og `Family.Create()`, og
+  `EventIndexWriter.Write` serialiserer den (camelCase-feltnavne, som i eksemplet ovenfor). `points`
+  dækker i dag kun apparaters `standAt` — ingen andre navngivne interaktionspunkter findes endnu.
+- **Genereres, skrives ikke i hånden** — afgjort: `Program.cs` kalder `EventIndexWriter.Write` ved
+  hver opstart af `Amballegaard.Server`, **før** `HouseModel`/`World` registreres som singletons
+  (husmodellen indlæses derfor nu eagerly i stedet for lazily ved første resolve). Den kan dermed
+  aldrig gå ud af sync, fordi den aldrig skrives i hånden ved siden af `house.json`/`Family.cs`.
+- **Hot vs. genstart — afgjort**: følger `house.json`s regel (genstart nødvendig). Da indekset
+  genereres automatisk på hver opstart, er der ingen separat manuel vedligeholdelse at huske — jf.
+  den opdaterede regel i CLAUDE.md.
+- **Test**: `tests/Amballegaard.Simulation.Tests/EventIndexTests.cs` dækker at alle rum/personer/
+  apparater er med med korrekte felter, og at `Write` producerer en læsbar JSON-fil.
+- **Endnu ikke gjort** (hører til senere trin i afsnit 12): loaderens validering (afsnit 8) slår
+  endnu ikke selv op i dette indeks — det kommer med trin 2 (`EventNode`-loader).
 
 ## 10. Udfoldede eksempler (til brug i spec-filen)
 
@@ -240,7 +245,7 @@ opslagsfil, fx `data/events/index.json`, med alle id'er en event-fil kan referer
   action: { type: "goto", target: { kind: "point", value: "badN" } },
   oncomplete: [] }
 
-{ person: "stephan", id: TOBED-16", trigger: { type: "passive" },
+{ person: "stephan", id: "TOBED-16", trigger: { type: "passive" },
   action: { type: "goto", target: { kind: "point", value: "badN" } },
   oncomplete: [] }
 ```
@@ -283,9 +288,8 @@ udfoldet her; skal færdiggøres ved implementering.)
 
 ## 12. Foreslået implementeringsrækkefølge
 
-1. **ID-indeks-generator** (afsnit 9.2): aflæs `house.json`/`Family.cs` og skriv
-   `data/events/index.json`. Skal findes **før** loaderen, da dens validering (næste trin) bruger
-   indekset som kilde til sandhed.
+1. ~~**ID-indeks-generator** (afsnit 9.2): aflæs `house.json`/`Family.cs` og skriv
+   `data/events/index.json`.~~ **Gjort** (2026-10-09) — se afsnit 9.2 for detaljer.
 2. `EventNode`-model + loader (mappe-scan af `data/events/*.json`, hot-reload, validering jf.
    afsnit 8 mod ID-indekset) — ingen ny agent-adfærd endnu, bare data ind og valideret.
 3. Klokkeslæt-trigger (krydsningstjek, daglig rearming, robust over for `TimeScale`/`Paused`/

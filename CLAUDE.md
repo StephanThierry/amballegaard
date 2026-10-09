@@ -34,14 +34,12 @@ Sådan tolkes den (aftalt med brugeren 2026-10-07):
   mens `/api/house` sender filen rå — så en ny åbning eller hvidevare ser rigtig ud i browseren, mens
   simulationen ikke kender den, og `ToggleDoor` fejler tavst. `data/furniture.json` hot-reloades derimod.
 - Serveren bygges uden apphost (`UseAppHost=false`), fordi Windows blokerer den nybyggede exe.
-- **Findes `data/events/index.json` (ID-indekset til dagsplan-motoren, se `docs/dagsplan-motor.md`
-  afsnit 9.2), skal den holdes ajour som en del af samme ændring**, hver gang en kodeændring
-  påvirker rum, personer eller interaktionspunkter — fx nye/omdøbte rum eller apparater i
-  `data/house.json`, eller nye/omdøbte beboere i `Family.cs`. Indekset er den eneste kilde en
-  uafhængig LLM-session bruger til at slå gyldige id'er op, når den skriver nye event-filer — bliver
-  den ikke opdateret, refererer nye events til id'er der ikke længere eksisterer, uden at nogen
-  opdager det før runtime-validering (eller slet ikke, hvis valideringen også kun slår op i det
-  forældede indeks).
+- **`data/events/index.json`** (ID-indekset til dagsplan-motoren, `docs/dagsplan-motor.md` afsnit
+  9.2) genereres automatisk af `EventIndexWriter` hver gang `Amballegaard.Server` starter
+  (`Program.cs`) — ingen manuel vedligeholdelse nødvendig, den kan ikke gå ud af sync, fordi den
+  aldrig skrives i hånden. Den følger dermed samme genstarts-regel som `data/house.json` ovenfor:
+  ændrer du rum/apparater i `house.json` eller beboere i `Family.cs`, får indekset de nye id'er med,
+  næste gang backenden genstartes — ikke før.
 
 ## Session-/token-økonomi
 
