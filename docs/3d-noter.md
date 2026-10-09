@@ -5,6 +5,11 @@ tværsnit i lave vægge, garageporte, yderdøres åbningsretning, den fælles kl
 tv-showet på stuens skærm.
 Konventioner for hele projektet står i `CLAUDE.md`; kørsel og struktur i `README.md`.
 
+**Læs dette først, hvis noget ikke reagerer i browseren:** se afsnit 5's punkt om
+`document.hidden`/rAF-throttling, før du bruger mange værktøjskald på at fejlsøge træk, hop eller
+anden kontinuerlig fysik/animation i den automatiserede fane. Det er ofte den reelle årsag, ikke en
+kodefejl.
+
 ## Filkort
 
 | Fil | Ansvar |

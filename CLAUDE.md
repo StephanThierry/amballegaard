@@ -35,6 +35,28 @@ Sådan tolkes den (aftalt med brugeren 2026-10-07):
   simulationen ikke kender den, og `ToggleDoor` fejler tavst. `data/furniture.json` hot-reloades derimod.
 - Serveren bygges uden apphost (`UseAppHost=false`), fordi Windows blokerer den nybyggede exe.
 
+## Session-/token-økonomi
+
+- **Lint:** kør `npm run lint 2>&1 | grep -c warning` og sammenlign med kendt baseline (74 pr.
+  2026-10-09) i stedet for at printe hele listen. Dyk kun ned i fuld output hvis tallet har ændret sig.
+- **Store filer:** brug `Grep -n` til at finde linjenumre først, læs derefter kun det relevante udsnit
+  med `Read`'s `offset`/`limit` — undgå at læse hele `Furniture.tsx` (3100+ linjer) eller store
+  `git diff`'er, når kun et lille udsnit er relevant.
+- **Claude in Chrome — tjek dette FØRST ved "virker ikke i browseren":** læs `docs/3d-noter.md`
+  afsnit 5 om `document.hidden`/rAF-throttling, før du kaster dig ud i en fejlsøgningsrunde med
+  gentagne screenshots og syntetiske pointer-events. Et kendt symptom (fysik/animation reagerer ikke
+  på træk) har sandsynligvis denne årsag, ikke en kodefejl.
+- **Browser-verifikation generelt:** foretræk programmatiske tjek (konsol-fejl,
+  `window.__scene`-forespørgsler, `window.__gl.info.render.frame`) frem for screenshots, når et
+  ja/nej-svar er nok. Brug `browser_batch` til at samle flere handlinger i ét kald i stedet for mange
+  enkeltstående. Luk faner med `tabs_close_mcp` når de ikke længere bruges.
+- **Commit-opsplitning** (jf. stående ønske om én commit pr. diskret ændring): skriv den endelige kode
+  direkte; opdel bagefter med målrettede `git diff`/`git apply`-patches eller `git add -p`-stil hunks
+  for de filer der skal splittes — undgå at kopiere hele filer til scratch og genskrive dem flere gange.
+- **`/compact`:** et naturligt tidspunkt at køre den er lige efter en committet og pushet ændring —
+  det er allerede et fast tjekpunkt i arbejdsgangen her, så det kræver ingen ny vane, bare en
+  tilføjelse til den eksisterende.
+
 ## Før du rører 3D-klienten
 
 Læs **`docs/3d-noter.md`** før ændringer i `web/src/three`. Den har filkortet og de ting der ellers
