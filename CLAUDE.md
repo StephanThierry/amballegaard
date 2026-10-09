@@ -66,3 +66,12 @@ orienteringen i en vægåbning (`out`, lokal +z, `swing`) som afgør hvilken vej
 der er inder- og yderside, og tv-showene (`show.ts` + `TvShow.tsx`). Desuden kommandoer til
 typecheck/lint, de faldgruber der koster mest tid (forældede Vite-moduler, house.json-genstarten),
 og opskriften på at stille kameraet præcist via `window.__cc` når en ændring skal ses i browseren.
+
+## Før du bygger dagsplan-motoren (Fase 4)
+
+Læs **`docs/dagsplan-motor.md`** før du implementerer beboernes dagsplan/events (fx `tobed`,
+`wakeup`, huslige gøremål). Den har den aftalte datamodel (en graf af `EventNode` pr. person,
+adresseret via `(person, id)`, kædet sammen med `oncomplete`/`waitFor`), handlingsvokabularet
+(`goto`/`speak`/`wait`/`setState`/`interact`/`chore`), hvorfor den erstatter en tidligere "schedule
++ delt event"-model, og den foreslåede implementeringsrækkefølge — skrevet før nogen kode fandtes,
+så en session kan gå direkte i gang uden at genopfinde designet.
