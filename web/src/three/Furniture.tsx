@@ -964,10 +964,10 @@ function Counter({ length }: { length: number }) {
  * med et høj blandingsbatteri der kan give vand ved klik, og en indbygget opvaskemaskine i venstre (nordlige)
  * ende af den gangvendte side (-x), hængslet forneden så den vipper ned og ud når man klikker.
  */
-function KitchenIsland({ id }: { id?: string }) {
+function KitchenIsland() {
   const f = fm()
-  const waterId = id ? `${id}-vand` : ''
-  const dishId = id ? `${id}-opvask` : ''
+  const waterId = 'kitchen_tap'
+  const dishId = 'dishwasher'
   const waterOn = useStore((s) => s.snapshot?.openDoors.includes(waterId) ?? false)
   const dishStep = useApplianceOpen(dishId)
   const dishDoor = useRef<THREE.Group>(null)
@@ -1090,12 +1090,12 @@ function DiningTable({ w, d }: { w: number; d: number }) {
  * Vaskemaskine og tørretumbler ved siden af hinanden, hver på en sokkel med to skuffer.
  * Lokalt: front mod +z; vaskemaskinen til venstre (-x), tørretumbleren til højre.
  */
-function WasherDryer({ id }: { id?: string }) {
+function WasherDryer() {
   const W = 0.6, D = 0.6, base = 0.36, H = 0.85
   return (
     <group>
-      <WasherDryerUnit x={-(W / 2 + 0.005)} dryer={false} id={id ? `${id}-vask` : undefined} W={W} D={D} base={base} H={H} />
-      <WasherDryerUnit x={W / 2 + 0.005} dryer={true} id={id ? `${id}-toer` : undefined} W={W} D={D} base={base} H={H} />
+      <WasherDryerUnit x={-(W / 2 + 0.005)} dryer={false} id="washer_door" W={W} D={D} base={base} H={H} />
+      <WasherDryerUnit x={W / 2 + 0.005} dryer={true} id="dryer_door" W={W} D={D} base={base} H={H} />
     </group>
   )
 }
@@ -2353,14 +2353,14 @@ const kitchenMats = (() => {
  * Fire høje hvide køkkenskabe (front mod +z): køleskab (åbnes, fyldt med madvarer), to søjler med Siemens-ovn
  * (overskab, ovn, tre skuffer) og fryser med fryseskuffer (åbnes). Køleskab/fryser styres via serverens openDoors.
  */
-function KitchenTall({ w = 2.2, fridgeId = 'koeleskab', freezerId = 'fryser' }: { w?: number; fridgeId?: string; freezerId?: string }) {
+function KitchenTall({ w = 2.2, fridgeId = 'fridge', freezerId = 'freezer' }: { w?: number; fridgeId?: string; freezerId?: string }) {
   const f = fm()
   const cw = w / 4, H = 2.2, D = 0.478
   const col = (i: number) => -w / 2 + cw * (i + 0.5)
   return (
     <group>
       <Fridge id={fridgeId} x={col(0)} cw={cw} H={H} D={D} />
-      {[1, 2].map((i) => <OvenColumn key={i} id={`ovn-${i}`} x={col(i)} cw={cw} H={H} D={D} />)}
+      {(['oven_1', 'oven_2'] as const).map((ovenId, i) => <OvenColumn key={ovenId} id={ovenId} x={col(i + 1)} cw={cw} H={H} D={D} />)}
       <Freezer id={freezerId} x={col(3)} cw={cw} H={H} D={D} />
       {/* Sokkel */}
       <Box p={[0, 0.05, -0.04]} s={[w, 0.1, D - 0.06]} m={f.darkTop} shadow={false} />
@@ -2508,7 +2508,7 @@ function Freezer({ id, x, cw, H, D }: { id: string; x: number; cw: number; H: nu
   const drawers = useRef<(THREE.Group | null)[]>([])
   const doorStep = useApplianceOpen(id)
   const doorOpen = useStore((st) => st.snapshot?.openDoors.includes(id) ?? false)
-  const drawerIds = [1, 2, 3, 4].map((i) => `${id}-skuffe-${i}`)
+  const drawerIds = [1, 2, 3, 4].map((i) => `${id}_drawer_${i}`)
   const open = useStore((st) => drawerIds.map((d) => st.snapshot?.openDoors.includes(d) ?? false).join(','))
   const pos = useRef([0, 0, 0, 0])
   const blue = useMemo(() => new THREE.MeshPhysicalMaterial({ color: '#a9cbe0', roughness: 0.25, transparent: true, opacity: 0.7, depthWrite: false }), [])
@@ -3109,9 +3109,9 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'kitchenRun': return <KitchenRun length={it.length ?? 3} id={it.id} />
     case 'counter': return <Counter length={it.length ?? 2} />
     case 'tallCabinets': return <KitchenTall w={it.w ?? 2.2} />
-    case 'kitchenIsland': return <KitchenIsland id={it.id} />
+    case 'kitchenIsland': return <KitchenIsland />
     case 'diningTable': return <DiningTable w={it.w ?? 2} d={it.d ?? 0.9} />
-    case 'washerDryer': return <WasherDryer id={it.id} />
+    case 'washerDryer': return <WasherDryer />
     case 'monitors': return <Monitors count={it.count ?? 1} size={it.width} layout={it.layout} games={it.games} />
     case 'workDesk': return <WorkDesk l={it.w ?? 1.6} d={it.d ?? 0.8} color={it.color} />
     case 'pcTower': return <PcTower />
