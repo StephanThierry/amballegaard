@@ -10,15 +10,22 @@ var housePath = builder.Configuration["HouseFile"]
     ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "house.json"));
 var eventIndexPath = builder.Configuration["EventIndexFile"]
     ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "events", "index.json"));
+var eventsDir = builder.Configuration["EventsDir"]
+    ?? Path.GetDirectoryName(eventIndexPath)!;
 
 var house = HouseModel.Load(housePath);
 var agents = Family.Create();
+
 // Dagsplan-motorens ID-indeks (docs/dagsplan-motor.md §9.2) regenereres ved hver opstart, så den
 // aldrig kan gå ud af sync med house.json/Family — ingen manuel vedligeholdelse nødvendig.
 EventIndexWriter.Write(house, agents, eventIndexPath);
 
+// Opret verdenen og start indlæsning af dagsplan-filer med hot-reload
+var world = new World(house, agents);
+world.LoadEventsFromDirectory(eventsDir);
+
 builder.Services.AddSingleton(house);
-builder.Services.AddSingleton(_ => new World(house, agents));
+builder.Services.AddSingleton(world);
 builder.Services.AddSingleton<SimulationGate>();
 builder.Services.AddHostedService<SimulationHost>();
 builder.Services.AddSignalR();

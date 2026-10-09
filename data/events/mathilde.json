@@ -1,0 +1,62 @@
+﻿{
+  "schemaVersion": 1,
+  "person": "mathilde",
+  "events": [
+    {
+      "id": "MAT_WAKE_1",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "idle" },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "mathilde", "id": "MAT_WAKE_2" } ]
+    },
+    {
+      "id": "MAT_WAKE_2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Godmorgen!" },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "mathilde", "id": "MAT_WAKE_3" } ]
+    },
+    {
+      "id": "MAT_WAKE_3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kitchen_family_room" } },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "mathilde", "id": "MAT_WAKE_4" } ]
+    },
+    {
+      "id": "MAT_WAKE_4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "eating" },
+      "chain": "wakeup",
+      "oncomplete": []
+    },
+    {
+      "id": "TOBED_MAT1",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kids_bathroom" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "mathilde", "id": "TOBED_MAT2" } ]
+    },
+    {
+      "id": "TOBED_MAT2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "wait", "seconds": 5.0 },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "mathilde", "id": "TOBED_MAT3" } ]
+    },
+    {
+      "id": "TOBED_MAT3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "mathildes_bedroom" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "mathilde", "id": "TOBED_MAT4" } ]
+    },
+    {
+      "id": "TOBED_MAT4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "sleeping" },
+      "chain": "tobed",
+      "oncomplete": []
+    }
+  ]
+}

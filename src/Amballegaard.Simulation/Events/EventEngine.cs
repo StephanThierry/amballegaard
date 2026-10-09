@@ -50,7 +50,6 @@ public sealed class EventEngine
         var agent = _world.Agents.FirstOrDefault(a => a.Id == node.Person);
         if (agent is null || !agent.Active) return false;
 
-        // Fan-in: tjek om forudsætninger i waitFor er opfyldt
         if (node.WaitFor is { Count: > 0 } waits)
         {
             var allDone = waits.All(w => _completedNodesToday.Contains((w.Person, w.Id)));
@@ -63,7 +62,6 @@ public sealed class EventEngine
             _pendingWaitFor.Remove(node);
         }
 
-        // Øjeblikkelige handlinger (setState og interact) jf. dagsplan-motor.md §4
         if (node.Action.Type == "setState")
         {
             if (!string.IsNullOrWhiteSpace(node.Action.Activity))
@@ -87,7 +85,6 @@ public sealed class EventEngine
             return true;
         }
 
-        // Tidsbaserede handlinger (goto, speak, wait, chore)
         _world.ClearPath(agent);
         agent.InEvent = true;
         agent.CurrentEventChain = node.Chain;
@@ -195,7 +192,7 @@ public sealed class EventEngine
         }
     }
 
-    public void Tick(double dt)
+    public void Tick(double dt, double timeScale = 1.0)
     {
         var finished = new List<ActiveExecution>();
 
@@ -207,7 +204,7 @@ public sealed class EventEngine
                 continue;
             }
 
-            var isDone = UpdateExecution(exec, dt);
+            var isDone = UpdateExecution(exec, dt, timeScale);
             if (isDone)
                 finished.Add(exec);
         }
@@ -220,7 +217,7 @@ public sealed class EventEngine
         CheckPendingWaitFors();
     }
 
-    private bool UpdateExecution(ActiveExecution exec, double dt)
+    private bool UpdateExecution(ActiveExecution exec, double dt, double timeScale)
     {
         var action = exec.Node.Action;
         var agent = exec.Agent;
@@ -241,7 +238,7 @@ public sealed class EventEngine
                         return true;
                     }
 
-                    exec.RepathCooldown -= dt;
+                    exec.RepathCooldown -= dt * timeScale;
                     if (exec.RepathCooldown <= 0)
                     {
                         exec.RepathCooldown = 0.5;
@@ -263,15 +260,17 @@ public sealed class EventEngine
                 return agent.Target is null;
 
             case "speak":
+                // Talebobler holdes i realtid så de kan læses
                 exec.Timer -= dt;
                 return exec.Timer <= 0 || agent.Speech is null;
 
             case "wait":
-                exec.Timer -= dt;
+                // Wait skalerer med timeScale
+                exec.Timer -= dt * timeScale;
                 return exec.Timer <= 0;
 
             case "chore":
-                exec.ChoreRemaining -= dt;
+                exec.ChoreRemaining -= dt * timeScale;
                 if (exec.ChoreRemaining <= 0)
                 {
                     _world.ClearPath(agent);
@@ -280,7 +279,7 @@ public sealed class EventEngine
 
                 if (agent.Target is null)
                 {
-                    exec.ChorePauseRemaining -= dt;
+                    exec.ChorePauseRemaining -= dt * timeScale;
                     if (exec.ChorePauseRemaining <= 0)
                     {
                         exec.ChorePauseRemaining = 2.0;

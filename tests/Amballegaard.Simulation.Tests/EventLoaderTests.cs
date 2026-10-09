@@ -178,4 +178,28 @@ public class EventLoaderTests
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public void Production_EventFiles_Are_Valid_Against_Index()
+    {
+        var dataDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../data/events"));
+        if (!Directory.Exists(dataDir))
+            dataDir = Path.GetFullPath("data/events");
+
+        if (!Directory.Exists(dataDir)) return; // Kør kun hvis data/events findes
+
+        var nodes = EventLoader.LoadDirectory(dataDir);
+        var indexPath = Path.Combine(dataDir, "index.json");
+        if (!File.Exists(indexPath)) return;
+
+        var index = System.Text.Json.JsonSerializer.Deserialize<EventIndex>(
+            File.ReadAllText(indexPath),
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(index);
+        var report = EventValidator.Validate(nodes, index!);
+
+        // Der må ikke være en eneste fejl i produktions-filerne!
+        Assert.True(report.IsValid, string.Join("; ", report.Errors.Select(e => $"[{e.Person}:{e.NodeId}] {e.Message}")));
+    }   
 }

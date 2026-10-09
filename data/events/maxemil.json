@@ -1,0 +1,62 @@
+﻿{
+  "schemaVersion": 1,
+  "person": "maxemil",
+  "events": [
+    {
+      "id": "MAX_WAKE_1",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "idle" },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "maxemil", "id": "MAX_WAKE_2" } ]
+    },
+    {
+      "id": "MAX_WAKE_2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Ggab... jeg kommer nu mor." },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "maxemil", "id": "MAX_WAKE_3" } ]
+    },
+    {
+      "id": "MAX_WAKE_3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kitchen_family_room" } },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "maxemil", "id": "MAX_WAKE_4" } ]
+    },
+    {
+      "id": "MAX_WAKE_4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "eating" },
+      "chain": "wakeup",
+      "oncomplete": []
+    },
+    {
+      "id": "TOBED_M1",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kids_bathroom" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "maxemil", "id": "TOBED_M2" } ]
+    },
+    {
+      "id": "TOBED_M2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "wait", "seconds": 5.0 },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "maxemil", "id": "TOBED_M3" } ]
+    },
+    {
+      "id": "TOBED_M3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "maxemils_bedroom" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "maxemil", "id": "TOBED_M4" } ]
+    },
+    {
+      "id": "TOBED_M4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "sleeping" },
+      "chain": "tobed",
+      "oncomplete": []
+    }
+  ]
+}

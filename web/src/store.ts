@@ -131,6 +131,7 @@ export const setAgentActive = (id: string, active: boolean) => connection?.invok
 export const toggleDoor = (id: string) => connection?.invoke('ToggleDoor', id)
 export const toggleMower = () => connection?.invoke('ToggleMower')
 export const jumpToTimeOfDay = (hours: number) => connection?.invoke('JumpToTimeOfDay', hours)
+export const shiftTime = (minutes: number) => connection?.invoke('ShiftTime', minutes)
 export const setObstacles = (rects: { id: string; x0: number; z0: number; x1: number; z1: number }[]) =>
   connection?.invoke('SetObstacles', rects).catch((e) =>
     console.warn('Serveren kunne ikke modtage møblernes placering — er backend genstartet efter seneste opdatering?', e))

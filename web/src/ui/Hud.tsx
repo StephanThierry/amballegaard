@@ -1,25 +1,35 @@
 import { useEffect, useState } from 'react'
-import { currentSimSeconds, jumpToTimeOfDay, requestProfile, setAdaptive, setAgentActive, setAvatarStyle, setPaused, setQuality, setTimeScale, useStore, type AvatarStyle } from '../store'
+import { currentSimSeconds, jumpToTimeOfDay, requestProfile, setAdaptive, setAgentActive, setAvatarStyle, setPaused, setQuality, setTimeScale, shiftTime, useStore, type AvatarStyle } from '../store'
 import { MAX_LEVEL, QUALITY } from '../three/quality'
 import { SUNRISE_JUMP, SUNSET_JUMP } from '../three/sun'
 import { resetView, rotateView } from '../three/camera'
 import type { VectorRec, WallMode } from '../types'
 import { vectorText } from '../three/VectorTool'
 
-const SPEEDS = [1, 60, 300, 1200]
+// Understøtter Pause, 1×, 2×, 4× og 8×
+const SPEEDS = [1, 2, 4, 8]
 
-const ACTIVITY: Record<string, string> = { idle: 'Står stille', walk: 'Går' }
+const ACTIVITY: Record<string, string> = {
+  idle: 'Står stille',
+  walk: 'Går',
+  sleeping: 'Sover',
+  eating: 'Spiser',
+  tidying: 'Rydder op',
+}
 
 function useClock() {
   const [t, setT] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setT(currentSimSeconds()), 250)
+    // Opdateres hver 50ms så sekunderne flyder jævnt ved høje hastigheder
+    const id = setInterval(() => setT(currentSimSeconds()), 50)
     return () => clearInterval(id)
   }, [])
   const day = Math.floor(t / 86400) + 1
   const h = Math.floor((t % 86400) / 3600)
   const m = Math.floor((t % 3600) / 60)
-  return { day, time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` }
+  const s = Math.floor(t % 60)
+  const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return { day, time }
 }
 
 export function Hud() {
@@ -29,7 +39,7 @@ export function Hud() {
   const selected = s.agents.find((a) => a.id === s.selectedAgent)
   const selState = s.snapshot?.agents.find((a) => a.id === s.selectedAgent)
   const paused = s.snapshot?.paused ?? false
-  const scale = s.snapshot?.timeScale ?? 60
+  const scale = s.snapshot?.timeScale ?? 1
 
   const view = (mode: WallMode, roof: boolean) => s.set({ wallMode: mode, showRoof: roof })
   const viewKey = s.wallMode === 'full' ? (s.showRoof ? 'roof' : 'full') : s.wallMode
@@ -51,14 +61,24 @@ export function Hud() {
         <div className="title">Amballegaard <span className={s.connected ? 'dot on' : 'dot'} title={s.connected ? 'Forbundet' : 'Afbrudt'} /></div>
         <a className="showcase-link" href="/showcase.html" target="_blank" rel="noreferrer">Avatar-showcase ↗</a>
         <div className="clock">Dag {day} · <b>{time}</b></div>
+
+        {/* Hastighedsvælger: Pause / 1× / 2× / 4× / 8× */}
         <div className="row">
           <button className={paused ? 'active' : ''} onClick={() => setPaused(!paused)} title="Pause">{paused ? '▶' : '❚❚'}</button>
           {SPEEDS.map((v) => (
-            <button key={v} className={!paused && scale === v ? 'active' : ''} onClick={() => { setTimeScale(v); setPaused(false) }}>
+            <button key={v} className={!paused && Math.round(scale) === v ? 'active' : ''} onClick={() => { setTimeScale(v); setPaused(false) }}>
               {v === 1 ? '1×' : `${v}×`}
             </button>
           ))}
         </div>
+
+        {/* Relative tidspring (-30 min / +30 min) */}
+        <div className="row">
+          <button onClick={() => shiftTime(-30)} title="Spol 30 minutter tilbage">-30 min</button>
+          <button onClick={() => shiftTime(30)} title="Spol 30 minutter frem">+30 min</button>
+        </div>
+
+        {/* Spring til solopgang/solnedgang */}
         <div className="row">
           <button className="icon-btn" onClick={() => jumpToTimeOfDay(SUNRISE_JUMP)} title="Spring til solopgang">
             <SunIcon rising /> Solopgang
@@ -134,7 +154,6 @@ export function Hud() {
   )
 }
 
-/** Slider fra ydelse til kvalitet + adaptiv tilstand. Niveauet sættes automatisk ved første opstart. */
 function QualityPanel() {
   const level = useStore((s) => s.quality)
   const adaptive = useStore((s) => s.adaptive)
@@ -193,7 +212,6 @@ function VectorPanel() {
   )
 }
 
-/** Sol over en horisontlinje med pil op (solopgang) eller ned (solnedgang). */
 function SunIcon({ rising }: { rising: boolean }) {
   return (
     <svg width="18" height="16" viewBox="0 0 24 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">

@@ -3,6 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace Amballegaard.Simulation.Events;
 
+/// <summary>Mål for en goto-handling (rum, person eller interaktionspunkt).</summary>
+[JsonConverter(typeof(ActionTargetConverter))]
+public sealed record ActionTarget(string Kind, string Value);
+
 /// <summary>Gør at target kan skrives både som simpel streng ("dishwasher") eller objekt ({ kind, value }).</summary>
 public sealed class ActionTargetConverter : JsonConverter<ActionTarget>
 {
@@ -76,9 +80,6 @@ public sealed record EventTrigger
     public required string Type { get; init; } // "time" | "passive"
     public string? Value { get; init; }        // fx "20:30"
 }
-
-/// <summary>Mål for en goto-handling (rum, person eller interaktionspunkt).</summary>
-public sealed record ActionTarget(string Kind, string Value);
 
 /// <summary>Handlingsvokabular jf. specifikationens §4.</summary>
 public sealed record EventAction

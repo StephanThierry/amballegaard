@@ -15,10 +15,6 @@ export function Avatars() {
   return <>{agents.filter((a) => active.split(',').includes(a.id)).map((a) => <Avatar key={a.id} info={a} />)}</>
 }
 
-/**
- * Hjerte (eller kys, for de replikker der ender sådan) der stiger op midtvejs mellem Stephan og Lisa,
- * mens serveren har dem i et kærligheds-øjeblik (World.LoveEffect) — se docs/3d-noter.md.
- */
 export function LoveEffect() {
   const kind = useStore((s) => s.snapshot?.loveEffect ?? null)
   const stephan = useStore((s) => s.snapshot?.agents.find((a) => a.id === 'stephan'))
@@ -34,15 +30,16 @@ export function LoveEffect() {
 }
 
 function Avatar({ info }: { info: AgentInfo }) {
+  const H = info.appearance.height
   const root = useRef<THREE.Group>(null)
   const legL = useRef<THREE.Group>(null), legR = useRef<THREE.Group>(null)
   const armL = useRef<THREE.Group>(null), armR = useRef<THREE.Group>(null)
   const body = useRef<THREE.Group>(null)
   const state = useRef({
     init: false, pos: new THREE.Vector3(), heading: 0, phase: 0, speed: 0, lift: 0,
-    /** Drop-position der holdes indtil serveren har bekræftet flytningen. */
     pin: null as { x: number; z: number; until: number } | null,
     ground: new THREE.Vector3(),
+    sleepProgress: 0,
   })
   const selected = useStore((s) => s.selectedAgent === info.id)
   const dragging = useStore((s) => s.dragging === info.id)
@@ -61,6 +58,7 @@ function Avatar({ info }: { info: AgentInfo }) {
 
   useFrame((frame, dt) => {
     const snap = useStore.getState().snapshot?.agents.find((a) => a.id === info.id)
+    const timeScale = useStore.getState().snapshot?.timeScale ?? 1
     const g = root.current
     if (!snap || !g) return
     const s = state.current
@@ -81,13 +79,17 @@ function Avatar({ info }: { info: AgentInfo }) {
       s.init = true
     }
     const before = s.pos.clone()
-    s.pos.lerp(target, 1 - Math.exp(-dt * (isDragged ? 18 : 5)))
+
+    // Lerp følger hurtigere med ved 2×, 4× og 8×, så avataren ikke halter bagud
+    const followRate = isDragged ? 18 : Math.max(6, 6 * Math.sqrt(timeScale))
+    s.pos.lerp(target, 1 - Math.exp(-dt * followRate))
     const v = before.distanceTo(s.pos) / Math.max(dt, 1e-3)
     s.speed += (v - s.speed) * Math.min(1, dt * 8)
+
     if (!isDragged) {
       let dh = snap.heading - s.heading
       dh = Math.atan2(Math.sin(dh), Math.cos(dh))
-      s.heading += dh * Math.min(1, dt * 8)
+      s.heading += dh * Math.min(1, dt * Math.max(8, 8 * timeScale))
     }
     s.lift += ((isDragged ? 0.45 : 0) - s.lift) * Math.min(1, dt * 10)
     g.position.copy(s.pos)
@@ -98,7 +100,6 @@ function Avatar({ info }: { info: AgentInfo }) {
     headingRef.current = s.heading
 
     if (isDragged) {
-      // Dingler med arme og ben mens den bæres.
       s.phase += dt * 9
       const d = Math.sin(s.phase) * 0.35
       if (legL.current) legL.current.rotation.x = d
@@ -107,15 +108,55 @@ function Avatar({ info }: { info: AgentInfo }) {
       if (armR.current) armR.current.rotation.set(-2.6, 0, 0.2)
       return
     }
-    if (armL.current) armL.current.rotation.set(0, 0, 0)
-    if (armR.current) armR.current.rotation.set(0, 0, 0)
-    const walking = Math.min(1, s.speed / 0.6)
-    s.phase += dt * (info.kind === 'dog' ? 11 : 7.5) * walking
+
+    const isSleeping = snap.activity === 'sleeping'
+    const isTidying = snap.activity === 'tidying'
+
+    s.sleepProgress += ((isSleeping ? 1 : 0) - s.sleepProgress) * Math.min(1, dt * 6)
+
+    if (s.sleepProgress > 0.01) {
+      if (info.kind === 'dog') {
+        if (body.current) {
+          body.current.position.y = -0.16 * s.sleepProgress
+          body.current.rotation.set(0, 0, 0)
+        }
+      } else {
+        if (body.current) {
+          body.current.rotation.x = (-Math.PI / 2) * s.sleepProgress
+          body.current.position.y = 0.18 * s.sleepProgress
+          body.current.position.z = (H * 0.45) * s.sleepProgress
+        }
+      }
+      if (legL.current) legL.current.rotation.set(0, 0, 0)
+      if (legR.current) legR.current.rotation.set(0, 0, 0)
+      if (armL.current) armL.current.rotation.set(0, 0, 0)
+      if (armR.current) armR.current.rotation.set(0, 0, 0)
+      return
+    }
+
+    if (body.current) {
+      body.current.rotation.set(0, 0, 0)
+      body.current.position.z = 0
+    }
+
+    const walking = Math.min(1, s.speed / 0.4)
+    // Skalerer ben/arm sving med reel ganghastighed (ved 4×/8× løber de med hurtigere skridt)
+    const animSpeedMult = Math.max(1, s.speed / 0.8)
+    s.phase += dt * (info.kind === 'dog' ? 11 : 7.5) * walking * animSpeedMult
     const swing = Math.sin(s.phase) * 0.55 * walking
+
     if (legL.current) legL.current.rotation.x = swing
     if (legR.current) legR.current.rotation.x = -swing
-    if (armL.current) armL.current.rotation.x = -swing * 0.8
-    if (armR.current) armR.current.rotation.x = swing * 0.8
+
+    if (isTidying && walking < 0.1) {
+      const tidyWave = Math.sin(frame.clock.elapsedTime * 6) * 0.35
+      if (armL.current) armL.current.rotation.set(-0.45 + tidyWave, 0, 0.1)
+      if (armR.current) armR.current.rotation.set(-0.45 - tidyWave, 0, -0.1)
+    } else {
+      if (armL.current) armL.current.rotation.set(-swing * 0.8, 0, 0)
+      if (armR.current) armR.current.rotation.set(swing * 0.8, 0, 0)
+    }
+
     if (body.current) body.current.position.y = Math.abs(Math.cos(s.phase)) * 0.025 * walking
   })
 
@@ -124,7 +165,6 @@ function Avatar({ info }: { info: AgentInfo }) {
     set({ selectedAgent: selected ? null : info.id })
   }
 
-  /** Træk-og-slip: drag starter først når musen har flyttet sig lidt, så et klik stadig vælger beboeren. */
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0 || useStore.getState().tool === 'vector') return
     e.stopPropagation()
@@ -157,7 +197,6 @@ function Avatar({ info }: { info: AgentInfo }) {
     window.addEventListener('pointerup', up)
   }
 
-  const H = info.appearance.height
   return (
     <group ref={root} onClick={onClick} onPointerDown={onPointerDown}
       onPointerOver={() => { if (!useStore.getState().dragging) document.body.style.cursor = 'grab' }}
@@ -171,7 +210,6 @@ function Avatar({ info }: { info: AgentInfo }) {
               ? <DogBody a={info.appearance} legs={[legL, legR, armL, armR]} />
               : <LowPolyResident info={info} speedRef={speedRef} flailRef={flailRef} />}
       </group>
-      {/* Kontaktskygge under fødderne for at forankre figuren */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
         <circleGeometry args={[info.kind === 'dog' ? 0.3 : H * 0.17, 24]} />
         <meshBasicMaterial color="#000" transparent opacity={0.18} depthWrite={false} />
@@ -183,7 +221,10 @@ function Avatar({ info }: { info: AgentInfo }) {
         </mesh>
       )}
       {(selected || speech) && (
-        <Html position={[0, H + 0.3, 0]} zIndexRange={[20, 0]} style={{ pointerEvents: 'none' }}>
+        <Html 
+          position={[0, state.current.sleepProgress > 0.5 ? 0.45 : H + 0.3, state.current.sleepProgress > 0.5 ? 0.3 : 0]} 
+          zIndexRange={[20, 0]} 
+          style={{ pointerEvents: 'none' }}>
           <div className="avatar-label">
             {speech && <div className="bubble">{speech}</div>}
             {selected && <div className="nametag"><b>{info.name}</b><span>{roomName}</span></div>}
@@ -196,12 +237,9 @@ function Avatar({ info }: { info: AgentInfo }) {
 
 type LimbRef = React.RefObject<THREE.Group | null>
 
-
-
 function DogBody({ a, legs }: { a: Appearance; legs: LimbRef[] }) {
   const fur = useMemo(() => mat(a.hair, 0.95), [a.hair])
   const dark = useMemo(() => mat('#2a2018', 0.5), [])
-  // Trav: diagonale par (forreste venstre + bageste højre) bevæger sig sammen — rækkefølgen matcher legL/legR/armL/armR-svinget.
   const legPos: [number, number][] = [[-0.09, 0.2], [0.09, 0.2], [-0.09, -0.2], [0.09, -0.2]]
   return (
     <group>
@@ -232,4 +270,3 @@ function DogBody({ a, legs }: { a: Appearance; legs: LimbRef[] }) {
     </group>
   )
 }
-

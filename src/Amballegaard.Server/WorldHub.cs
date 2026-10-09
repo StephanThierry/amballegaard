@@ -13,6 +13,11 @@ public sealed class WorldHub(World world, SimulationGate gate) : Hub
     {
         lock (gate) return world.Snapshot();
     }
+    
+    public void ShiftTime(double minutes)
+    {
+        lock (gate) world.ShiftTime(minutes);
+    }
 
     public void SetTimeScale(double scale)
     {

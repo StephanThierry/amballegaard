@@ -1,9 +1,8 @@
 using System.Runtime.CompilerServices;
 using Amballegaard.Simulation.Agents;
+using Amballegaard.Simulation.Events;
 using Amballegaard.Simulation.House;
 
-// Lader testprojektet tjekke internal tilstand (fx Agent.InLoveMeeting/NextSpeechIn) direkte i stedet for
-// kun at kunne observere via de offentlige snapshot-felter.
 [assembly: InternalsVisibleTo("Amballegaard.Simulation.Tests")]
 
 namespace Amballegaard.Simulation;
@@ -14,10 +13,6 @@ namespace Amballegaard.Simulation;
 /// </summary>
 public sealed class World
 {
-    private readonly Events.EventEngine _eventEngine;
-
-    public Events.EventEngine EventEngine => _eventEngine;
-
     private const double OutdoorWanderRadius = 2.5;
     private const double WallClearance = 0.3;
     /// <summary>Hvor tæt på (m) en beboer skal være en dør på sin rute, før den åbnes — og hvor langt efter den lukkes.</summary>
@@ -27,8 +22,12 @@ public sealed class World
     /// <summary>Efter et kærligheds-øjeblik går der mindst så lang tid, før en af dem siger noget tilfældigt igen —
     /// ellers kan en hverdagsreplik ("Har du husket madpakken?") overlappe med kys-stemningen lige bagefter.</summary>
     private const double LovePostPauseSeconds = 20;
+
     private readonly Events.TimeTriggerTracker _timeTracker = new();
-    private readonly List<Events.EventNode> _eventNodes = []; // Indlæses via EventLoader
+    private readonly Events.EventEngine _eventEngine;
+    private readonly List<Events.EventNode> _eventNodes = [];
+    private Events.EventLoader? _eventLoader;
+
     private readonly Random _rng;
     private readonly List<Agent> _agents;
     private readonly HashSet<string> _openDoors = [];
@@ -49,6 +48,7 @@ public sealed class World
     public HouseModel House { get; }
     public IReadOnlyList<Agent> Agents => _agents;
     public NavGrid Nav { get; }
+    public Events.EventEngine EventEngine => _eventEngine;
 
     /// <summary>Lysstyrke i procent (0/50/100) for dæmpbare lamper.</summary>
     public IReadOnlyDictionary<string, int> LampLevels => _lampLevels;
@@ -60,12 +60,11 @@ public sealed class World
     /// <summary>Simuleret tid siden midnat dag 1.</summary>
     public TimeSpan SimTime { get; private set; }
 
-    /// <summary>Simulerede sekunder pr. reelt sekund.</summary>
-    public double TimeScale { get; set; } = 60;
+    /// <summary>Simulerede sekunder pr. reelt sekund (standard 1x jf. §13).</summary>
+    public double TimeScale { get; set; } = 1;
     public bool Paused { get; set; }
 
-    /// <summary>"heart" eller "kiss" mens Stephan og Lisa står i et kærligheds-øjeblik sammen, ellers null.
-    /// Klienten tegner den midtvejs mellem deres to positioner.</summary>
+    /// <summary>"heart" eller "kiss" mens Stephan og Lisa står i et kærligheds-øjeblik sammen, ellers null.</summary>
     public string? LoveEffect => _lovePhase == LovePhase.Together ? _loveEffectKind : null;
 
     public World(HouseModel house, IEnumerable<Agent> agents, int seed = 1234, TimeSpan? startTime = null)
@@ -80,8 +79,8 @@ public sealed class World
         SimTime = startTime ?? TimeSpan.FromHours(7);
         Nav = new NavGrid(house);
         Mower = new Mower(new Random(seed + 1));
+        _eventEngine = new Events.EventEngine(this);
 
-        // Pejse er tændt fra start; deres tilstand deles med dørene (OpenDoors = åbne porte / tændte pejse).
         foreach (var o in house.Openings.Where(o => o.Type == "fireplace"))
             _openDoors.Add(o.Id);
 
@@ -96,40 +95,183 @@ public sealed class World
             agent.NextSpeechIn = 3 + _rng.NextDouble() * 20;
         }
         _loveCooldown = 20 + _rng.NextDouble() * 40;
-        _eventEngine = new Events.EventEngine(this);
     }
 
+    /// <summary>
+    /// Starter indlæsning og hot-reload af dagsplan-events fra data/events/ (jf. dagsplan-motor.md §7).
+    /// </summary>
+    public void LoadEventsFromDirectory(string eventsDir, bool enableHotReload = true)
+    {
+        _eventLoader?.Dispose();
+        _eventLoader = new Events.EventLoader(eventsDir, () => Events.EventIndexWriter.Build(House, _agents));
+        _eventLoader.EventsReloaded += (nodes, report) =>
+        {
+            _eventNodes.Clear();
+            _eventNodes.AddRange(nodes);
+            _eventEngine.LoadNodes(_eventNodes);
+            if (report.IsValid)
+            {
+                Console.WriteLine($"[Events] Indlæst {nodes.Count} dagsplan-noder fra {eventsDir} (OK)");
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[Events] {report.Errors.Count()} valideringsfejl i dagsplan-filer:");
+                foreach (var err in report.Errors)
+                    Console.WriteLine($"  - [{err.Person}:{err.NodeId}] {err.Message}");
+                Console.ResetColor();
+            }
+        };
+        _eventLoader.Start(enableHotReload);
+    }
+
+public void Tick(double realDt)
+    {
+        foreach (var agent in _agents.Where(a => a.Active))
+            StepSpeech(agent, realDt);
+
+        StepLove(realDt);
+        Mower.Tick(realDt);
+
+        if (Paused) return;
+
+        var prevSimTime = SimTime;
+        SimTime += TimeSpan.FromSeconds(realDt * TimeScale);
+
+        // Trin 3 + 4: Evaluér klokkeslæt og afvikl dagsplan-events
+        var dueEvents = _timeTracker.EvaluateCrossing(prevSimTime, SimTime, _eventNodes);
+        foreach (var evt in dueEvents)
+            _eventEngine.StartNode(evt);
+
+        // EventEngine timere skalerer med TimeScale
+        _eventEngine.Tick(realDt, TimeScale);
+
+        foreach (var agent in _agents.Where(a => a.Active))
+            StepWander(agent, realDt);
+    }
+
+    private void StepWander(Agent agent, double dt)
+    {
+        if (agent.Target is not { } target)
+        {
+            agent.IdleSeconds -= dt * TimeScale;
+            if (!agent.InEvent) agent.Activity = "idle";
+            if (agent.IdleSeconds > 0) return;
+            if (agent.InLoveMeeting || agent.InEvent || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
+            if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
+            else agent.Target = NextWanderTarget(agent);
+            if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
+            return;
+        }
+
+        // Sub-stepping loop for 1×, 2×, 4× og 8× hastigheder
+        var remainingStep = agent.Speed * dt * Math.Max(1.0, TimeScale);
+
+        while (remainingStep > 0 && agent.Target is { } currentTarget)
+        {
+            var delta = currentTarget - agent.Position;
+            var dist = delta.Length;
+            agent.Activity = "walk";
+            agent.Heading = Math.Atan2(delta.X, delta.Z);
+
+            if (dist <= remainingStep)
+            {
+                agent.Position = currentTarget;
+                agent.Travelled += dist;
+                remainingStep -= dist;
+
+                if (agent.Path is { } path && agent.PathIndex + 1 < path.Count)
+                {
+                    agent.PathIndex++;
+                    agent.Target = path[agent.PathIndex];
+                }
+                else
+                {
+                    var app = agent.PendingAppliance;
+                    ClearPath(agent);
+                    agent.IdleSeconds = 2 + _rng.NextDouble() * 6;
+                    if (app is not null)
+                    {
+                        agent.HeldDoors.Add(app.Id);
+                        agent.Heading = Math.PI;
+                        agent.IdleSeconds = 5;
+                        Say(agent, Speech.Appliance(app.Kind, _rng));
+                    }
+                    break;
+                }
+            }
+            else
+            {
+                agent.Position += delta.Normalized * remainingStep;
+                agent.Travelled += remainingStep;
+                remainingStep = 0;
+            }
+        }
+
+        UpdateHeldDoors(agent);
+        agent.RoomId = House.RoomAt(agent.Position)?.Id ?? (agent.WanderRoomId is null ? "" : agent.RoomId);
+    }
+
+    /// <summary>
+    /// Relativ tidsforskydning (+/- minutter) med resolve jf. §13.
+    /// Blokerer for at springe baglæns over midnat (§13.7).
+    /// </summary>
+    public void ShiftTime(double minutes)
+    {
+        var currentDayStart = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays));
+        var target = SimTime + TimeSpan.FromMinutes(minutes);
+
+        // Bloker for tilbage-spring over midnat (§13.7)
+        if (target < currentDayStart)
+            target = currentDayStart;
+
+        SimTime = target;
+        _timeTracker.FastForwardTo(SimTime, _eventNodes);
+
+        // Analytisk resolve af alle avatarers tilstand på måltidspunktet (§13.3)
+        var nodeMap = _eventNodes.ToDictionary(n => (n.Person, n.Id));
+        Events.TimeResolver.Resolve(this, SimTime, nodeMap, _rng);
+    }
+
+    /// <summary>Spring frem til næste gang klokken er hours med resolve.</summary>
+    public void JumpToTimeOfDay(double hours)
+    {
+        hours = Math.Clamp(hours, 0, 24);
+        var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
+        if (target <= SimTime) target += TimeSpan.FromDays(1);
+        SimTime = target;
+        _timeTracker.FastForwardTo(SimTime, _eventNodes);
+
+        var nodeMap = _eventNodes.ToDictionary(n => (n.Person, n.Id));
+        Events.TimeResolver.Resolve(this, SimTime, nodeMap, _rng);
+    }
 
     /// <summary>Møblernes fodaftryk (sendt fra klienten, som kender modellernes faktiske mål).</summary>
     public void SetObstacles(IEnumerable<(Vec2 Min, Vec2 Max)> rects)
     {
         Nav.SetObstacles(rects);
-        // Beboere der allerede står inde i et møbel (fx startede i sengen) flyttes ud til nærmeste frie plads.
         foreach (var agent in _agents.Where(a => a.WanderRoomId is not null && !Nav.IsWalkable(a.Position)))
         {
             if (Nav.NearestWalkable(agent.Position) is not { } free) continue;
             agent.Position = free;
             ClearPath(agent);
         }
-        // Igangværende ruter kan gå gennem de nye møbler — planlæg dem forfra.
         foreach (var agent in _agents.Where(a => a.Path is not null)) ClearPath(agent);
     }
 
-    /// <summary>Brugeren har trukket en beboer hertil. Beboeren vandrer derefter i det nye rum (eller omkring stedet, hvis det er udenfor).</summary>
-/// <summary>Brugeren har trukket en beboer hertil. Beboeren vandrer derefter i det nye rum (eller omkring stedet, hvis det er udenfor).</summary>
+    /// <summary>Brugeren har trukket en beboer hertil. Beboeren vandrer derefter i det nye rum.</summary>
     public bool MoveAgent(string id, Vec2 to)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
         if (id is "stephan" or "lisa") CancelLoveMeeting();
-        _eventEngine.CancelAgent(id); // Knækker igangværende dagsplan-event pænt (jf. dagsplan-motor.md §6)
+        _eventEngine.CancelAgent(id); // Knækker igangværende dagsplan-event pænt (jf. §6)
 
         to = PushAwayFromWalls(ClampToSite(to));
         var room = House.RoomAt(to);
         if (room is null && Geometry.PointInPolygon(to, _exterior))
-            return false; // inde i en væg — afvis hellere end at lande beboeren i murværket
+            return false;
 
-        // Indendørs: sluppet oven på et møbel → nærmeste frie plads.
         if (room is not null && Nav.NearestWalkable(to) is { } free) to = free;
         agent.Position = to;
         ClearPath(agent);
@@ -138,7 +280,6 @@ public sealed class World
         agent.WanderRoomId = room?.Id;
         agent.WanderAnchor = room is null ? to : null;
 
-        // Trækker man Stephan eller Lisa ind til den anden, reagerer den der allerede var der med et kys.
         if (room is not null && id is "stephan" or "lisa")
         {
             var other = _agents.FirstOrDefault(a => a.Id == (id == "stephan" ? "lisa" : "stephan"));
@@ -148,8 +289,6 @@ public sealed class World
         return true;
     }
 
-    /// <summary>Den der allerede stod i rummet byder den anden velkommen med et kys, når den bliver trukket derhen.
-    /// Går direkte i Together-fasen (ingen gang-hen-til-hinanden, de står jo allerede tæt efter trækket).</summary>
     private void StartArrivalKiss(Agent arriving, Agent resident)
     {
         resident.InLoveMeeting = true;
@@ -168,13 +307,13 @@ public sealed class World
         _lovePhase = LovePhase.Together;
     }
 
-    /// <summary>Slå en beboer til/fra. Fra = forsvinder og står stille; til = fortsætter hvor den var.</summary>
-  public bool SetActive(string id, bool active)
+    /// <summary>Slå en beboer til/fra.</summary>
+    public bool SetActive(string id, bool active)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
         if (!active && id is "stephan" or "lisa") CancelLoveMeeting();
-        if (!active) _eventEngine.CancelAgent(id); // <-- Knækker event hvis agenten slås fra
+        if (!active) _eventEngine.CancelAgent(id);
 
         agent.Active = active;
         if (!active) { ClearPath(agent); agent.Speech = null; }
@@ -187,11 +326,10 @@ public sealed class World
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return;
         if (id is "stephan" or "lisa") CancelLoveMeeting();
+        _eventEngine.CancelAgent(id);
         Say(agent, Speech.PickedUp(agent, _rng), 3.2);
     }
 
-    /// <summary>Afbryder et igangværende kærligheds-øjeblik rent (bruges hvis Stephan eller Lisa bliver
-    /// trukket, samlet op eller slået fra midt i det), så de ikke sidder fast i <c>InLoveMeeting</c>.</summary>
     private void CancelLoveMeeting()
     {
         if (_lovePhase == LovePhase.None) return;
@@ -211,12 +349,10 @@ public sealed class World
         agent.NextSpeechIn = 12 + _rng.NextDouble() * 30;
     }
 
-
     /// <summary>Åbn/luk en port eller tænd/sluk en pejs.</summary>
     public bool ToggleDoor(string openingId)
     {
         if (House.Openings.All(o => o.Id != openingId) && House.Appliances.All(a => a.Id != openingId)) return false;
-        // Dæmpbare lamper skifter 0 % → 50 % → 100 % → 0 %.
         if (House.Appliances.FirstOrDefault(a => a.Id == openingId) is { Kind: "lamp" })
         {
             _lampLevels[openingId] = (_lampLevels.GetValueOrDefault(openingId) + 50) % 150;
@@ -226,10 +362,17 @@ public sealed class World
         return true;
     }
 
+    /// <summary>Sætter en dør/hvidevares tilstand eksplicit til åben eller lukket (bruges af interact-action).</summary>
+    public bool SetDoorState(string id, bool open)
+    {
+        var isOpen = _openDoors.Contains(id);
+        if (open && !isOpen) return ToggleDoor(id);
+        if (!open && isOpen) return ToggleDoor(id);
+        return true;
+    }
+
     private void StepSpeech(Agent agent, double dt)
     {
-        // Venter på at svare på en samtale-starter: når starterens replik er læst færdig, svares der
-        // med en tilfældig af de forberedte svar. Egen tilfældig snak venter til bagefter.
         if (agent.PendingResponseOptions is { } options)
         {
             agent.PendingResponseIn -= dt;
@@ -247,17 +390,12 @@ public sealed class World
             return;
         }
         agent.NextSpeechIn -= dt;
-        // Højst to snakker ad gangen, så det ikke bliver kaos. Under et kærligheds-øjeblik styrer
-        // StepLove replikkerne alene, så den tilfældige snak blander sig ikke.
         if (agent.InLoveMeeting || agent.InEvent || agent.NextSpeechIn > 0 || _agents.Count(a => a.Speech is not null) >= 2) return;
 
         if (agent.Kind == AgentKind.Dog) { Say(agent, Speech.DogLines[_rng.Next(Speech.DogLines.Count)]); return; }
 
-        // Andre tilstedeværende i samme rum (aktive, ikke hunden, ikke midt i egen replik, allerede ved at
-        // skulle svare på noget andet, eller midt i et kærligheds-øjeblik) — kun med dem til stede kan en
-        // samtale-starter vælges.
         var others = _agents.Where(a => a.Id != agent.Id && a.Active && a.Kind != AgentKind.Dog
-            && a.RoomId == agent.RoomId && a.Speech is null && a.PendingResponseOptions is null && !a.InLoveMeeting).ToList();
+            && a.RoomId == agent.RoomId && a.Speech is null && a.PendingResponseOptions is null && !a.InLoveMeeting && !a.InEvent).ToList();
 
         var pool = Speech.Lines.Where(l => l.Fits(agent)).ToList();
         if (others.Count > 0) pool.AddRange(Speech.Conversations.Where(c => c.Fits(agent)));
@@ -267,74 +405,14 @@ public sealed class World
         Say(agent, line.Text);
         if (line.Responses is { } responses && others.Count > 0)
         {
-            // Modparten stopper op med det samme og svarer, lige når starterens replik er færdig.
             var responder = others[_rng.Next(others.Count)];
             ClearPath(responder);
             responder.PendingResponseOptions = responses;
             responder.PendingResponseIn = agent.SpeechRemaining;
         }
     }
+    
 
-    private void StepWander(Agent agent, double dt)
-    {
-        if (agent.Target is not { } target)
-        {
-            agent.IdleSeconds -= dt;
-            agent.Activity = "idle";
-            if (agent.IdleSeconds > 0) return;
-            // Under et kærligheds-øjeblik, eller mens man venter på at svare i en samtale: bliv stående.
-            if (agent.InLoveMeeting || agent.InEvent || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
-            if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
-            else agent.Target = NextWanderTarget(agent);
-            if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
-            return;
-        }
-
-        var delta = target - agent.Position;
-        var dist = delta.Length;
-        var step = agent.Speed * dt;
-        agent.Activity = "walk";
-        agent.Heading = Math.Atan2(delta.X, delta.Z);
-
-        if (dist <= step)
-        {
-            agent.Position = target;
-            agent.Travelled += dist;
-            if (agent.Path is { } path && agent.PathIndex + 1 < path.Count)
-            {
-                agent.PathIndex++;
-                agent.Target = path[agent.PathIndex];
-            }
-            else
-            {
-                var app = agent.PendingAppliance;
-                ClearPath(agent);
-                agent.IdleSeconds = 2 + _rng.NextDouble() * 6;
-                if (app is not null)
-                {
-                    // Fremme ved køleskab/fryser: åbn, kig ind og kommentér. Lukkes igen ved næste tur.
-                    agent.HeldDoors.Add(app.Id);
-                    agent.Heading = Math.PI;
-                    agent.IdleSeconds = 5;
-                    Say(agent, Speech.Appliance(app.Kind, _rng));
-                }
-            }
-        }
-        else
-        {
-            agent.Position += delta.Normalized * step;
-            agent.Travelled += step;
-        }
-        UpdateHeldDoors(agent);
-        agent.RoomId = House.RoomAt(agent.Position)?.Id ?? (agent.WanderRoomId is null ? "" : agent.RoomId);
-    }
-
-    /// <summary>
-    /// Stephan og Lisas kærligheds-øjeblikke: når de ind imellem står i samme rum, går de helt tæt sammen
-    /// og udveksler en lille replikudveksling, mens et hjerte (eller et kys, for de replikker der ender sådan)
-    /// stiger op mellem dem. Kører uafhængigt af <see cref="StepWander"/>, som bare får `InLoveMeeting`-flaget
-    /// at vide så den ikke sender dem videre af sig selv, mens det står på.
-    /// </summary>
     private void StepLove(double dt)
     {
         var stephan = _agents.FirstOrDefault(a => a.Id == "stephan");
@@ -345,14 +423,14 @@ public sealed class World
         {
             _loveCooldown -= dt;
             if (_loveCooldown > 0) return;
-            _loveCooldown = 40 + _rng.NextDouble() * 70; // uanset udfald: prøv ikke igen i et stykke tid
+            _loveCooldown = 40 + _rng.NextDouble() * 70;
             if (!stephan.Active || !lisa.Active) return;
             if (stephan.RoomId == "" || stephan.RoomId != lisa.RoomId) return;
             if (stephan.Speech is not null || lisa.Speech is not null) return;
-            if (stephan.HeldDoors.Count > 0 || lisa.HeldDoors.Count > 0) return; // ikke midt i køleskab/fryser
-            if (_rng.NextDouble() > 0.5) return; // ikke hver gang de er i samme rum
+            if (stephan.HeldDoors.Count > 0 || lisa.HeldDoors.Count > 0) return;
+            if (stephan.InEvent || lisa.InEvent) return;
+            if (_rng.NextDouble() > 0.5) return;
 
-            // Mødes midtvejs mellem dem, forskudt vinkelret på hinanden så de ender side om side.
             var mid = (stephan.Position + lisa.Position) * 0.5;
             var dir = lisa.Position - stephan.Position;
             var perp = dir.Length > 0.01 ? new Vec2(-dir.Z, dir.X).Normalized : new Vec2(1, 0);
@@ -374,8 +452,7 @@ public sealed class World
 
         if (_lovePhase == LovePhase.Walking)
         {
-            if (stephan.Target is not null || lisa.Target is not null) return; // stadig på vej
-            // Begge fremme: vend ansigtet mod hinanden og start replikudvekslingen.
+            if (stephan.Target is not null || lisa.Target is not null) return;
             var toLisa = lisa.Position - stephan.Position;
             stephan.Heading = Math.Atan2(toLisa.X, toLisa.Z);
             lisa.Heading = Math.Atan2(-toLisa.X, -toLisa.Z);
@@ -386,9 +463,6 @@ public sealed class World
             return;
         }
 
-        // Together: skridt gennem replikkerne med en lille pause imellem, så en sidste "hale" med
-        // hjertet/kysset synligt uden tale, og slip dem så tilbage til den normale vandre-AI. De bliver
-        // stående mindst LoveTogetherMinSeconds, uanset hvor kort replikudvekslingen er.
         if (_loveScript is null) { _lovePhase = LovePhase.None; return; }
         _loveTogetherElapsed += dt;
         _loveTogetherTimer -= dt;
@@ -405,7 +479,6 @@ public sealed class World
             lisa.InLoveMeeting = false;
             stephan.IdleSeconds = 1 + _rng.NextDouble() * 2;
             lisa.IdleSeconds = 1 + _rng.NextDouble() * 2;
-            // Ingen tilfældig snak fra nogen af dem lige efter — ellers overlapper det med kys-stemningen.
             stephan.NextSpeechIn = Math.Max(stephan.NextSpeechIn, LovePostPauseSeconds);
             lisa.NextSpeechIn = Math.Max(lisa.NextSpeechIn, LovePostPauseSeconds);
             _lovePhase = LovePhase.None;
@@ -415,7 +488,7 @@ public sealed class World
         }
         if (_loveLineIndex == _loveScript.Lines.Count)
         {
-            _loveTogetherTimer = 1.4; // hale: hjerte/kys ses lidt længere uden ny replik
+            _loveTogetherTimer = 1.4;
             _loveLineIndex++;
             return;
         }
@@ -428,17 +501,12 @@ public sealed class World
         _loveLineIndex++;
     }
 
-    /// <summary>
-    /// Vælg et mål indendørs: oftest et sted i det nuværende rum, ellers et andet rum eller hjem igen.
-    /// Ruten findes med A*, og dørene på ruten noteres, så de kan åbnes/lukkes undervejs.
-    /// </summary>
     private void PlanIndoorWalk(Agent agent)
     {
-        agent.HeldDoors.Clear(); // luk køleskab/fryser efter besøget
+        agent.HeldDoors.Clear();
         var roll = _rng.NextDouble();
         var roomId = agent.WanderRoomId!;
 
-        // Indimellem: gå hen og kig i køleskabet eller fryseren.
         var visitable = House.Appliances.Where(a => a.Kind is "fridge" or "freezer").ToList();
         if (agent.Kind != AgentKind.Dog && visitable.Count > 0 && _rng.NextDouble() < 0.18)
         {
@@ -481,9 +549,6 @@ public sealed class World
 
     internal void StartAgentPath(Agent agent, List<Vec2> path) => StartPath(agent, path);
 
-    internal void ClearAgentPath(Agent agent) => ClearPath(agent);
-
-    /// <summary>Hold de døre åbne som beboeren er ved at gå igennem; slip dem igen bagefter.</summary>
     private static void UpdateHeldDoors(Agent agent)
     {
         foreach (var c in agent.Crossings)
@@ -503,9 +568,10 @@ public sealed class World
         agent.PendingAppliance = null;
     }
 
+    internal void ClearAgentPath(Agent agent) => ClearPath(agent);
+
     private Vec2 NextWanderTarget(Agent agent)
     {
-        // Udendørs: tilfældigt punkt omkring stedet, uden for huset og inden for grunden.
         var anchor = agent.WanderAnchor ?? agent.Position;
         for (var i = 0; i < 40; i++)
         {
@@ -518,7 +584,6 @@ public sealed class World
         return agent.Position;
     }
 
-    /// <summary>Skubber et punkt ud, så der er mindst <see cref="WallClearance"/> til nærmeste væg (et drop direkte på en væg lander ved siden af).</summary>
     private Vec2 PushAwayFromWalls(Vec2 p)
     {
         for (var iter = 0; iter < 3; iter++)
@@ -548,51 +613,5 @@ public sealed class World
         if (House.Site?.Bounds is not { Length: 2 } b) return p;
         const double m = 0.5;
         return new Vec2(Math.Clamp(p.X, b[0][0] + m, b[1][0] - m), Math.Clamp(p.Z, b[0][1] + m, b[1][1] - m));
-    }
-
-// I World.Tick(double realDt):
-public void Tick(double realDt)
-    {
-        foreach (var agent in _agents.Where(a => a.Active))
-            StepSpeech(agent, realDt);
-
-        StepLove(realDt);
-        Mower.Tick(realDt);
-
-        if (Paused) return;
-
-        var prevSimTime = SimTime;
-        SimTime += TimeSpan.FromSeconds(realDt * TimeScale);
-
-        // Trin 3 + 4: Evaluér klokkeslæt og afvikl dagsplan-events
-        var dueEvents = _timeTracker.EvaluateCrossing(prevSimTime, SimTime, _eventNodes);
-        foreach (var evt in dueEvents)
-            _eventEngine.StartNode(evt);
-
-        _eventEngine.Tick(realDt);
-
-        foreach (var agent in _agents.Where(a => a.Active))
-            StepWander(agent, realDt);
-    }
-
-    // I World.JumpToTimeOfDay(double hours):
-    public void JumpToTimeOfDay(double hours)
-    {
-        hours = Math.Clamp(hours, 0, 24);
-        var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
-        if (target <= SimTime) target += TimeSpan.FromDays(1);
-        SimTime = target;
-
-        // Sørg for at trackeren bogfører tidsspringet korrekt uden at affyre fortidige noder
-        _timeTracker.FastForwardTo(SimTime, _eventNodes);
-    }    
-
-    /// <summary>Sætter en dør/hvidevares tilstand eksplicit til åben eller lukket (bruges af event-motorens interact-action).</summary>
-    public bool SetDoorState(string id, bool open)
-    {
-        var isOpen = _openDoors.Contains(id);
-        if (open && !isOpen) return ToggleDoor(id);
-        if (!open && isOpen) return ToggleDoor(id);
-        return true;
     }
 }

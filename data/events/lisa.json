@@ -1,0 +1,106 @@
+﻿{
+  "schemaVersion": 1,
+  "person": "lisa",
+  "events": [
+    {
+      "id": "WAKE_L1",
+      "trigger": { "type": "time", "value": "07:05" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "maxemils_bedroom" } },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "lisa", "id": "WAKE_L2" } ]
+    },
+    {
+      "id": "WAKE_L2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Godmorgen Max-Emil! Tid til at stÃ¥ op." },
+      "chain": "wakeup",
+      "oncomplete": [
+        { "person": "maxemil", "id": "MAX_WAKE_1" },
+        { "person": "lisa", "id": "WAKE_L3" }
+      ]
+    },
+    {
+      "id": "WAKE_L3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "mathildes_bedroom" } },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "lisa", "id": "WAKE_L4" } ]
+    },
+    {
+      "id": "WAKE_L4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Godmorgen Mathilde, op og spise morgenmad!" },
+      "chain": "wakeup",
+      "oncomplete": [
+        { "person": "mathilde", "id": "MAT_WAKE_1" },
+        { "person": "lisa", "id": "WAKE_L5" }
+      ]
+    },
+    {
+      "id": "WAKE_L5",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kitchen_family_room" } },
+      "chain": "wakeup",
+      "oncomplete": [ { "person": "lisa", "id": "WAKE_L6" } ]
+    },
+    {
+      "id": "WAKE_L6",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "eating" },
+      "chain": "wakeup",
+      "oncomplete": []
+    },
+    {
+      "id": "OPVASK_1",
+      "trigger": { "type": "time", "value": "08:00" },
+      "action": { "type": "goto", "target": { "kind": "point", "value": "dishwasher" } },
+      "chain": "opvask",
+      "oncomplete": [ { "person": "lisa", "id": "OPVASK_2" } ]
+    },
+    {
+      "id": "OPVASK_2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "interact", "target": "dishwasher", "state": "open" },
+      "chain": "opvask",
+      "oncomplete": [ { "person": "lisa", "id": "OPVASK_3" } ]
+    },
+    {
+      "id": "OPVASK_3",
+      "trigger": { "type": "passive" },
+      "action": {
+        "type": "chore",
+        "points": [ "dishwasher", "kitchen_tap" ],
+        "activity": "tidying",
+        "duration": { "min": 20, "max": 35 }
+      },
+      "chain": "opvask",
+      "oncomplete": [ { "person": "lisa", "id": "OPVASK_4" } ]
+    },
+    {
+      "id": "OPVASK_4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "interact", "target": "dishwasher", "state": "closed" },
+      "chain": "opvask",
+      "oncomplete": [ { "person": "lisa", "id": "OPVASK_5" } ]
+    },
+    {
+      "id": "OPVASK_5",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "SÃ¥ er opvaskemaskinen klaret!" },
+      "chain": "opvask",
+      "oncomplete": []
+    },
+    {
+      "id": "SLEEP_L1",
+      "trigger": { "type": "time", "value": "22:30" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "master_bedroom" } },
+      "oncomplete": [ { "person": "lisa", "id": "SLEEP_L2" } ]
+    },
+    {
+      "id": "SLEEP_L2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "sleeping" },
+      "oncomplete": []
+    }
+  ]
+}

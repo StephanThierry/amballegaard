@@ -1,0 +1,82 @@
+﻿{
+  "schemaVersion": 1,
+  "person": "stephan",
+  "events": [
+    {
+      "id": "WAKE_1",
+      "trigger": { "type": "time", "value": "07:00" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kitchen_family_room" } },
+      "oncomplete": [ { "person": "stephan", "id": "WAKE_2" } ]
+    },
+    {
+      "id": "WAKE_2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Godmorgen! Jeg sÃ¦tter kaffe over." },
+      "oncomplete": [ { "person": "stephan", "id": "WAKE_3" } ]
+    },
+    {
+      "id": "WAKE_3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "wait", "seconds": 4.0 },
+      "oncomplete": []
+    },
+    {
+      "id": "TOBED_S1",
+      "trigger": { "type": "time", "value": "19:30" },
+      "action": { "type": "goto", "target": { "kind": "person", "value": "maxemil" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "stephan", "id": "TOBED_S2" } ]
+    },
+    {
+      "id": "TOBED_S2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "SÃ¥ er det sengetid, unger! Ud pÃ¥ badevÃ¦relset og bÃ¸rste tÃ¦nder." },
+      "chain": "tobed",
+      "oncomplete": [
+        { "person": "stephan", "id": "TOBED_S3" },
+        { "person": "maxemil", "id": "TOBED_M1" },
+        { "person": "mathilde", "id": "TOBED_MAT1" }
+      ]
+    },
+    {
+      "id": "TOBED_S3",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "kids_bathroom" } },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "stephan", "id": "TOBED_S4" } ]
+    },
+    {
+      "id": "TOBED_S4",
+      "trigger": { "type": "passive" },
+      "action": { "type": "wait", "seconds": 6.0 },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "stephan", "id": "TOBED_S5" } ]
+    },
+    {
+      "id": "TOBED_S5",
+      "trigger": { "type": "passive" },
+      "action": { "type": "speak", "text": "Husk at bÃ¸rste grundigt!" },
+      "chain": "tobed",
+      "oncomplete": [ { "person": "stephan", "id": "TOBED_S6" } ]
+    },
+    {
+      "id": "TOBED_S6",
+      "trigger": { "type": "passive" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "living_room" } },
+      "chain": "tobed",
+      "oncomplete": []
+    },
+    {
+      "id": "SLEEP_S1",
+      "trigger": { "type": "time", "value": "22:30" },
+      "action": { "type": "goto", "target": { "kind": "room", "value": "master_bedroom" } },
+      "oncomplete": [ { "person": "stephan", "id": "SLEEP_S2" } ]
+    },
+    {
+      "id": "SLEEP_S2",
+      "trigger": { "type": "passive" },
+      "action": { "type": "setState", "activity": "sleeping" },
+      "oncomplete": []
+    }
+  ]
+}
