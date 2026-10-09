@@ -45,10 +45,11 @@ Pointen: en "scene" er ikke en selvstændig datastruktur — den er bare den del
 
 ```
 person:   "stephan"            // aktøren der udfører handlingen
-id:       15                   // unikt inden for denne persons fil
+id:       "TOBED15"                   // unikt inden for denne persons fil
 trigger:  { type: "time", value: "20:30" }   // eller: { type: "passive" }
 action:   { ... }               // se afsnit 4
-oncomplete: [ { person: "stephan", id: 16 }, { person: "maxemil", id: 20 } ]
+duration: {min: 5, max: 5} // sekunder - f.eks. tale varighed afhænger af budskabet om det er langt eller kort "Hej" vil være min 1, max 2, og "Hvad skal vi have at spise?" - vil være min: 4, max: 7 før Oncomplete event kan trigger et respons.
+oncomplete: [ { person: "stephan", id: 16 }, { person: "maxemil", id: "TOBED1" } ]
 chain:    "tobed"               // valgfrit, kun til debugging/gruppering — se afsnit 6
 waitFor:  [ { person: "...", id: ... } ]   // valgfrit, se afsnit 3.2 (fan-in / join)
 ```
@@ -93,7 +94,7 @@ Noter pr. type:
 
 - **`goto` med `kind: "person"` er dynamisk**: find målet der hvor det *er*, og path-replanlæg hvis
   det bevæger sig undervejs. `kind: "room"/"point"` er statiske mål. Vigtig skelnen, skal stå
-  eksplicit i spec-filen.
+  eksplicit i spec-filen. VEd goto værelse skal man bare være tæt på centrum, ved goto person skal man være i samme rum og 1m eller mindre fra personen
 - **`setState` er øjeblikkelig** — den sætter `Activity` og fyrer straks sin `oncomplete`. En
   tilstand som "sover" varer ikke fordi noden "er i gang", men fordi der ikke er noget
   `oncomplete`, og ingen anden kæde rører personen før en fremtidig node (typisk en andens
@@ -201,7 +202,7 @@ opslagsfil, fx `data/events/index.json`, med alle id'er en event-fil kan referer
 
 ```
 {
-  "rooms":   [ { "id": "badN", "name": "Badeværelse" }, ... ],
+  "rooms":   [ { "id": "badN", "name": "Lille badeværelse" }, ... ],
   "persons": [ { "id": "maxemil", "name": "Max-Emil", "kind": "Child", "homeRoomId": "v2" }, ... ],
   "points":  [ { "id": "koekkenoe-opvask", "kind": "dishwasher", "roomId": "koekken" }, ... ]
 }
@@ -224,22 +225,22 @@ opslagsfil, fx `data/events/index.json`, med alle id'er en event-fil kan referer
 ### `tobed` (uddrag — Stephan finder Max-Emil, siger god nat-replik, begge går i badeværelset)
 
 ```
-{ person: "stephan", id: 12, trigger: { type: "time", value: "19:30" },
+{ person: "stephan", id: "TOBED-12", trigger: { type: "time", value: "19:30" },
   action: { type: "goto", target: { kind: "person", value: "maxemil" } },
-  oncomplete: [ { person: "stephan", id: 15 } ] }
+  oncomplete: [ { person: "stephan", id: "TOBED-13" } ] }
 
-{ person: "stephan", id: 15, trigger: { type: "passive" },
+{ person: "stephan", id: "TOBED-13", trigger: { type: "passive" },
   action: { type: "speak", text: "Så skal vi gøre klar til at komme i seng." },
   oncomplete: [
-    { person: "maxemil", id: 20 },
-    { person: "stephan", id: 16 }
+    { person: "maxemil", id: "TOBED-1" },
+    { person: "stephan", id: "TOBED-16" }
   ] }
 
-{ person: "maxemil", id: 20, trigger: { type: "passive" },
+{ person: "maxemil", id: "TOBED-1", trigger: { type: "passive" },
   action: { type: "goto", target: { kind: "point", value: "badN" } },
   oncomplete: [] }
 
-{ person: "stephan", id: 16, trigger: { type: "passive" },
+{ person: "stephan", id: TOBED-16", trigger: { type: "passive" },
   action: { type: "goto", target: { kind: "point", value: "badN" } },
   oncomplete: [] }
 ```
@@ -251,20 +252,20 @@ udfoldet her; skal færdiggøres ved implementering.)
 ### Tøm opvaskemaskine (fuldt eksempel, viser `interact` + `chore`)
 
 ```
-{ person: "lisa", id: 30, trigger: { type: "time", value: "08:00" },
+{ person: "lisa", id: "OPVASK30", trigger: { type: "time", value: "08:00" },
   action: { type: "goto", target: { kind: "point", value: "koekkenoe-opvask" } },
-  oncomplete: [ { person: "lisa", id: 31 } ] }
+  oncomplete: [ { person: "lisa", id: "OPVASK31" } ] }
 
-{ person: "lisa", id: 31, trigger: { type: "passive" },
+{ person: "lisa", id: "OPVASK31", trigger: { type: "passive" },
   action: { type: "interact", target: "koekkenoe-opvask", state: "open" },
-  oncomplete: [ { person: "lisa", id: 32 } ] }
+  oncomplete: [ { person: "lisa", id: "OPVASK32" } ] }
 
-{ person: "lisa", id: 32, trigger: { type: "passive" },
+{ person: "lisa", id: "OPVASK32", trigger: { type: "passive" },
   action: { type: "chore", points: ["koekkenoe-opvask", "koekkenoe-skab"],
             activity: "tidying", duration: { min: 40, max: 70 } },
-  oncomplete: [ { person: "lisa", id: 33 } ] }
+  oncomplete: [ { person: "lisa", id: "OPVASK33" } ] }
 
-{ person: "lisa", id: 33, trigger: { type: "passive" },
+{ person: "lisa", id: "OPVASK33", trigger: { type: "passive" },
   action: { type: "interact", target: "koekkenoe-opvask", state: "closed" },
   oncomplete: [] }
 ```
@@ -405,9 +406,9 @@ Bevidst afgrænsning — ikke overset.
 ### 13.7 Åbne spørgsmål
 
 - Bevares "Spring til solopgang/solnedgang", og skal de i så fald route gennem resolve-mekanismen
-  (13.3) i stedet for blot at kalde `JumpToTimeOfDay` som i dag?
+  (13.3) i stedet for blot at kalde `JumpToTimeOfDay` som i dag? - Ja, solop/nedgang bevares men implementeres efter samme metodik som at sætte et bestemt tidspunkt hvor resten bær fungre generic
 - Hvad sker der med dags-instansbogføringen (afsnit 5) når en **tilbage**-forskydning krydser
   midnat? Simplest: lad `-30 min` ikke kunne krydse tilbage over midnat (clamp ved 00:00); en fuld
-  løsning (genskabe gårsdagens instans) er ikke nødvendig for den oprindelige forespørgsel.
+  løsning (genskabe gårsdagens instans) er ikke nødvendig for den oprindelige forespørgsel. Bloker for -30 til tidligere dag.
 - Ny RPC: `ShiftTime(minutes)` (signeret, kan være negativ) — adskilt fra `JumpToTimeOfDay`, som
   forbliver absolut og fremad-kun til sine nuværende formål (hvis den bevares, jf. punkt 1 ovenfor).
