@@ -20,6 +20,12 @@ public sealed record Appearance(
 
 public sealed class Agent
 {
+    /// <summary>Sat mens beboeren udfører en handling i en dagsplan-kæde (se EventEngine).</summary>
+    public bool InEvent { get; set; }
+
+    /// <summary>Kosmetisk id på den igangværende dagsplan-kæde (fx "tobed", "wakeup") til log/UI.</summary>
+    public string? CurrentEventChain { get; set; }
+    
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required AgentKind Kind { get; init; }

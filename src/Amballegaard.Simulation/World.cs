@@ -14,6 +14,10 @@ namespace Amballegaard.Simulation;
 /// </summary>
 public sealed class World
 {
+    private readonly Events.EventEngine _eventEngine;
+
+    public Events.EventEngine EventEngine => _eventEngine;
+
     private const double OutdoorWanderRadius = 2.5;
     private const double WallClearance = 0.3;
     /// <summary>Hvor tæt på (m) en beboer skal være en dør på sin rute, før den åbnes — og hvor langt efter den lukkes.</summary>
@@ -23,7 +27,8 @@ public sealed class World
     /// <summary>Efter et kærligheds-øjeblik går der mindst så lang tid, før en af dem siger noget tilfældigt igen —
     /// ellers kan en hverdagsreplik ("Har du husket madpakken?") overlappe med kys-stemningen lige bagefter.</summary>
     private const double LovePostPauseSeconds = 20;
-
+    private readonly Events.TimeTriggerTracker _timeTracker = new();
+    private readonly List<Events.EventNode> _eventNodes = []; // Indlæses via EventLoader
     private readonly Random _rng;
     private readonly List<Agent> _agents;
     private readonly HashSet<string> _openDoors = [];
@@ -91,24 +96,9 @@ public sealed class World
             agent.NextSpeechIn = 3 + _rng.NextDouble() * 20;
         }
         _loveCooldown = 20 + _rng.NextDouble() * 40;
+        _eventEngine = new Events.EventEngine(this);
     }
 
-    /// <param name="realDt">Reel tid i sekunder siden sidste tick.</param>
-    public void Tick(double realDt)
-    {
-        // Talebobler kører i reel tid, så de kan læses uanset tidsfaktor.
-        foreach (var agent in _agents.Where(a => a.Active))
-            StepSpeech(agent, realDt);
-
-        StepLove(realDt);
-        Mower.Tick(realDt);
-
-        if (Paused) return;
-        SimTime += TimeSpan.FromSeconds(realDt * TimeScale);
-
-        foreach (var agent in _agents.Where(a => a.Active))
-            StepWander(agent, realDt);
-    }
 
     /// <summary>Møblernes fodaftryk (sendt fra klienten, som kender modellernes faktiske mål).</summary>
     public void SetObstacles(IEnumerable<(Vec2 Min, Vec2 Max)> rects)
@@ -126,11 +116,13 @@ public sealed class World
     }
 
     /// <summary>Brugeren har trukket en beboer hertil. Beboeren vandrer derefter i det nye rum (eller omkring stedet, hvis det er udenfor).</summary>
+/// <summary>Brugeren har trukket en beboer hertil. Beboeren vandrer derefter i det nye rum (eller omkring stedet, hvis det er udenfor).</summary>
     public bool MoveAgent(string id, Vec2 to)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
         if (id is "stephan" or "lisa") CancelLoveMeeting();
+        _eventEngine.CancelAgent(id); // Knækker igangværende dagsplan-event pænt (jf. dagsplan-motor.md §6)
 
         to = PushAwayFromWalls(ClampToSite(to));
         var room = House.RoomAt(to);
@@ -177,11 +169,13 @@ public sealed class World
     }
 
     /// <summary>Slå en beboer til/fra. Fra = forsvinder og står stille; til = fortsætter hvor den var.</summary>
-    public bool SetActive(string id, bool active)
+  public bool SetActive(string id, bool active)
     {
         var agent = _agents.FirstOrDefault(a => a.Id == id);
         if (agent is null) return false;
         if (!active && id is "stephan" or "lisa") CancelLoveMeeting();
+        if (!active) _eventEngine.CancelAgent(id); // <-- Knækker event hvis agenten slås fra
+
         agent.Active = active;
         if (!active) { ClearPath(agent); agent.Speech = null; }
         return true;
@@ -217,14 +211,6 @@ public sealed class World
         agent.NextSpeechIn = 12 + _rng.NextDouble() * 30;
     }
 
-    /// <summary>Spring frem til næste gang klokken er <paramref name="hours"/> (fx solopgang). Tiden går aldrig baglæns.</summary>
-    public void JumpToTimeOfDay(double hours)
-    {
-        hours = Math.Clamp(hours, 0, 24);
-        var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
-        if (target <= SimTime) target += TimeSpan.FromDays(1);
-        SimTime = target;
-    }
 
     /// <summary>Åbn/luk en port eller tænd/sluk en pejs.</summary>
     public bool ToggleDoor(string openingId)
@@ -263,7 +249,7 @@ public sealed class World
         agent.NextSpeechIn -= dt;
         // Højst to snakker ad gangen, så det ikke bliver kaos. Under et kærligheds-øjeblik styrer
         // StepLove replikkerne alene, så den tilfældige snak blander sig ikke.
-        if (agent.InLoveMeeting || agent.NextSpeechIn > 0 || _agents.Count(a => a.Speech is not null) >= 2) return;
+        if (agent.InLoveMeeting || agent.InEvent || agent.NextSpeechIn > 0 || _agents.Count(a => a.Speech is not null) >= 2) return;
 
         if (agent.Kind == AgentKind.Dog) { Say(agent, Speech.DogLines[_rng.Next(Speech.DogLines.Count)]); return; }
 
@@ -297,7 +283,7 @@ public sealed class World
             agent.Activity = "idle";
             if (agent.IdleSeconds > 0) return;
             // Under et kærligheds-øjeblik, eller mens man venter på at svare i en samtale: bliv stående.
-            if (agent.InLoveMeeting || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
+            if (agent.InLoveMeeting || agent.InEvent || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
             if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
             else agent.Target = NextWanderTarget(agent);
             if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
@@ -484,7 +470,7 @@ public sealed class World
         StartPath(agent, path);
     }
 
-    private void StartPath(Agent agent, List<Vec2> path)
+    internal void StartPath(Agent agent, List<Vec2> path)
     {
         agent.Path = path;
         agent.PathIndex = 0;
@@ -492,6 +478,10 @@ public sealed class World
         agent.Crossings = Nav.DoorsOnPath(agent.Position, path);
         agent.Travelled = 0;
     }
+
+    internal void StartAgentPath(Agent agent, List<Vec2> path) => StartPath(agent, path);
+    
+    internal void ClearAgentPath(Agent agent) => ClearPath(agent);
 
     /// <summary>Hold de døre åbne som beboeren er ved at gå igennem; slip dem igen bagefter.</summary>
     private static void UpdateHeldDoors(Agent agent)
@@ -504,7 +494,7 @@ public sealed class World
         }
     }
 
-    private static void ClearPath(Agent agent)
+    internal static void ClearPath(Agent agent)
     {
         agent.Target = null;
         agent.Path = null;
@@ -559,4 +549,41 @@ public sealed class World
         const double m = 0.5;
         return new Vec2(Math.Clamp(p.X, b[0][0] + m, b[1][0] - m), Math.Clamp(p.Z, b[0][1] + m, b[1][1] - m));
     }
+
+// I World.Tick(double realDt):
+public void Tick(double realDt)
+    {
+        foreach (var agent in _agents.Where(a => a.Active))
+            StepSpeech(agent, realDt);
+
+        StepLove(realDt);
+        Mower.Tick(realDt);
+
+        if (Paused) return;
+
+        var prevSimTime = SimTime;
+        SimTime += TimeSpan.FromSeconds(realDt * TimeScale);
+
+        // Trin 3 + 4: Evaluér klokkeslæt og afvikl dagsplan-events
+        var dueEvents = _timeTracker.EvaluateCrossing(prevSimTime, SimTime, _eventNodes);
+        foreach (var evt in dueEvents)
+            _eventEngine.StartNode(evt);
+
+        _eventEngine.Tick(realDt);
+
+        foreach (var agent in _agents.Where(a => a.Active))
+            StepWander(agent, realDt);
+    }
+
+// I World.JumpToTimeOfDay(double hours):
+public void JumpToTimeOfDay(double hours)
+{
+    hours = Math.Clamp(hours, 0, 24);
+    var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
+    if (target <= SimTime) target += TimeSpan.FromDays(1);
+    SimTime = target;
+
+    // Sørg for at trackeren bogfører tidsspringet korrekt uden at affyre fortidige noder
+    _timeTracker.FastForwardTo(SimTime, _eventNodes);
+}    
 }
