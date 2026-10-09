@@ -1339,40 +1339,49 @@ function Bookshelf({ w = 1.9, h = 1.9, d = 0.35, color = '#141414', shelves = 5 
 }
 
 /**
- * Sort stål-reol i IKEA BROR-stil: tynde runde ben, åbne hylder uden bagklædning. Pakker og kasser på de
- * to nederste hylder, dåser og langtidsholdbar mad på de to øverste. Lokalt: front mod +z, centreret i x.
+ * Sort stål-reol i IKEA BROR-stil: tynde runde ben, åbne hylder uden bagklædning. Nederste hylde har
+ * pakker og kasser (pap, træ og mørk plast, blandede farver), de to midterste dåser og tørvarer, og den
+ * øverste køkkenmaskiner og større kasser. Lokalt: front mod +z, centreret i x.
  */
 function PantryShelving({ w = 1.7, d = 0.4, h = 1.9 }: { w?: number; d?: number; h?: number }) {
   const f = fm()
   const k = kitchenMats()
-  const cardboard = useMemo(() => ['#c2a06a', '#b98f63', '#a9764c', '#d4b483']
-    .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 })), [])
+  const crates = useMemo(() => [
+    { color: '#c2a06a', roughness: 0.92 }, // pap, lys
+    { color: '#a9764c', roughness: 0.92 }, // pap, mørk
+    { color: '#8a5a34', roughness: 0.7 }, // træ
+    { color: '#6b4226', roughness: 0.65 }, // træ, mørk
+    { color: '#2a2a2c', roughness: 0.5 }, // mørk opbevaringskasse
+    { color: '#1c1d1f', roughness: 0.45 }, // mørk opbevaringskasse, sort
+  ].map((p) => new THREE.MeshStandardMaterial(p)), [])
+  const applianceMats = useMemo(() => ['#f3f2ee', '#c8312b', '#1c1d1f', '#c9ccce']
+    .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.35, metalness: c === '#c9ccce' ? 0.6 : 0.1 })), [])
   const post = 0.018
   const shelfT = 0.02
   const levelY = useMemo(() => Array.from({ length: 4 }, (_, i) => 0.02 + i * (h - 0.02 - shelfT) / 3), [h])
 
+  /** Nederste hylde: pakker og kasser, varierede farver/materialer. */
   const boxes = useMemo(() => {
     let seed = 13
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    const out: { lvl: number; x: number; z: number; bw: number; bd: number; bh: number; c: number; rotY: number }[] = []
-    for (const lvl of [0, 1]) {
-      let x = -w / 2 + 0.06
-      while (x < w / 2 - 0.1) {
-        const bw = 0.2 + rnd() * 0.16
-        const bd = d * (0.6 + rnd() * 0.3)
-        const bh = 0.15 + rnd() * 0.12
-        out.push({ lvl, x: x + bw / 2, z: -d / 2 + bd / 2 + 0.015, bw, bd, bh, c: Math.floor(rnd() * cardboard.length), rotY: (rnd() - 0.5) * 0.07 })
-        x += bw + 0.02
-      }
+    const out: { x: number; z: number; bw: number; bd: number; bh: number; c: number; rotY: number }[] = []
+    let x = -w / 2 + 0.06
+    while (x < w / 2 - 0.1) {
+      const bw = 0.2 + rnd() * 0.16
+      const bd = d * (0.6 + rnd() * 0.3)
+      const bh = 0.15 + rnd() * 0.12
+      out.push({ x: x + bw / 2, z: -d / 2 + bd / 2 + 0.015, bw, bd, bh, c: Math.floor(rnd() * crates.length), rotY: (rnd() - 0.5) * 0.07 })
+      x += bw + 0.02
     }
     return out
-  }, [w, d, cardboard.length])
+  }, [w, d, crates.length])
 
+  /** De to midterste hylder: dåser og tørvarer, som før. */
   const cans = useMemo(() => {
     let seed = 29
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
     const out: { lvl: number; x: number; z: number; type: 'can' | 'jar' | 'box'; c: number }[] = []
-    for (const lvl of [2, 3]) {
+    for (const lvl of [1, 2]) {
       let x = -w / 2 + 0.05
       while (x < w / 2 - 0.05) {
         const type = rnd() < 0.55 ? 'can' : rnd() < 0.75 ? 'jar' : 'box'
@@ -1384,6 +1393,25 @@ function PantryShelving({ w = 1.7, d = 0.4, h = 1.9 }: { w?: number; d?: number;
     return out
   }, [w, d, k.food.length])
 
+  /** Øverste hylde: køkkenmaskiner (kasse + knop/låg) og større kasser. */
+  const topShelf = useMemo(() => {
+    let seed = 41
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const out: { x: number; z: number; type: 'appliance' | 'box'; c: number; bw: number; bd: number; bh: number }[] = []
+    let x = -w / 2 + 0.07
+    while (x < w / 2 - 0.07) {
+      if (rnd() < 0.45) {
+        out.push({ x: x + 0.11, z: -d / 2 + 0.1 + rnd() * Math.max(0.02, d - 0.24), type: 'appliance', c: Math.floor(rnd() * applianceMats.length), bw: 0.22, bd: 0.16, bh: 0.2 })
+        x += 0.24
+      } else {
+        const bw = 0.26 + rnd() * 0.18, bd = d * (0.65 + rnd() * 0.25), bh = 0.18 + rnd() * 0.1
+        out.push({ x: x + bw / 2, z: -d / 2 + bd / 2 + 0.015, type: 'box', c: Math.floor(rnd() * crates.length), bw, bd, bh })
+        x += bw + 0.02
+      }
+    }
+    return out
+  }, [w, d, applianceMats.length, crates.length])
+
   return (
     <group>
       {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => (
@@ -1392,19 +1420,30 @@ function PantryShelving({ w = 1.7, d = 0.4, h = 1.9 }: { w?: number; d?: number;
         </mesh>
       ))}
       {levelY.map((y, i) => <Box key={i} p={[0, y, 0]} s={[w - post * 2, shelfT, d - post * 2]} m={f.blackSteel} />)}
-      {/* Pakker og kasser */}
+      {/* Pakker og kasser (nederste hylde) */}
       {boxes.map((b, i) => (
-        <group key={i} position={[b.x, levelY[b.lvl] + shelfT / 2 + b.bh / 2, b.z]} rotation={[0, b.rotY, 0]}>
-          <mesh material={cardboard[b.c]} castShadow><boxGeometry args={[b.bw, b.bh, b.bd]} /></mesh>
+        <group key={i} position={[b.x, levelY[0] + shelfT / 2 + b.bh / 2, b.z]} rotation={[0, b.rotY, 0]}>
+          <mesh material={crates[b.c]} castShadow><boxGeometry args={[b.bw, b.bh, b.bd]} /></mesh>
         </group>
       ))}
-      {/* Dåser og tørvarer */}
+      {/* Dåser og tørvarer (de to midterste hylder) */}
       {cans.map((it, i) => {
         const y = levelY[it.lvl] + shelfT / 2
         const m = k.food[it.c]
         if (it.type === 'can') return <mesh key={i} material={m} position={[it.x, y + 0.055, it.z]} castShadow><cylinderGeometry args={[0.034, 0.034, 0.11, 14]} /></mesh>
         if (it.type === 'jar') return <mesh key={i} material={m} position={[it.x, y + 0.06, it.z]} castShadow><cylinderGeometry args={[0.032, 0.032, 0.12, 14]} /></mesh>
         return <Box key={i} p={[it.x, y + 0.08, it.z]} s={[0.07, 0.16, 0.045]} m={m} />
+      })}
+      {/* Køkkenmaskiner og større kasser (øverste hylde) */}
+      {topShelf.map((it, i) => {
+        const y = levelY[3] + shelfT / 2
+        if (it.type === 'appliance') return (
+          <group key={i} position={[it.x, y, it.z]}>
+            <RoundedBox args={[it.bw, it.bh, it.bd]} radius={0.015} smoothness={2} position={[0, it.bh / 2, 0]} material={applianceMats[it.c]} castShadow />
+            <mesh material={f.steel} position={[0, it.bh + 0.015, -it.bd * 0.15]}><cylinderGeometry args={[0.025, 0.025, 0.04, 12]} /></mesh>
+          </group>
+        )
+        return <Box key={i} p={[it.x, y + it.bh / 2, it.z]} s={[it.bw, it.bh, it.bd]} m={crates[it.c]} />
       })}
     </group>
   )
