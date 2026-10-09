@@ -1338,6 +1338,77 @@ function Bookshelf({ w = 1.9, h = 1.9, d = 0.35, color = '#141414', shelves = 5 
   )
 }
 
+/**
+ * Sort stål-reol i IKEA BROR-stil: tynde runde ben, åbne hylder uden bagklædning. Pakker og kasser på de
+ * to nederste hylder, dåser og langtidsholdbar mad på de to øverste. Lokalt: front mod +z, centreret i x.
+ */
+function PantryShelving({ w = 1.7, d = 0.4, h = 1.9 }: { w?: number; d?: number; h?: number }) {
+  const f = fm()
+  const k = kitchenMats()
+  const cardboard = useMemo(() => ['#c2a06a', '#b98f63', '#a9764c', '#d4b483']
+    .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92 })), [])
+  const post = 0.018
+  const shelfT = 0.02
+  const levelY = useMemo(() => Array.from({ length: 4 }, (_, i) => 0.02 + i * (h - 0.02 - shelfT) / 3), [h])
+
+  const boxes = useMemo(() => {
+    let seed = 13
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const out: { lvl: number; x: number; z: number; bw: number; bd: number; bh: number; c: number; rotY: number }[] = []
+    for (const lvl of [0, 1]) {
+      let x = -w / 2 + 0.06
+      while (x < w / 2 - 0.1) {
+        const bw = 0.2 + rnd() * 0.16
+        const bd = d * (0.6 + rnd() * 0.3)
+        const bh = 0.15 + rnd() * 0.12
+        out.push({ lvl, x: x + bw / 2, z: -d / 2 + bd / 2 + 0.015, bw, bd, bh, c: Math.floor(rnd() * cardboard.length), rotY: (rnd() - 0.5) * 0.07 })
+        x += bw + 0.02
+      }
+    }
+    return out
+  }, [w, d, cardboard.length])
+
+  const cans = useMemo(() => {
+    let seed = 29
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    const out: { lvl: number; x: number; z: number; type: 'can' | 'jar' | 'box'; c: number }[] = []
+    for (const lvl of [2, 3]) {
+      let x = -w / 2 + 0.05
+      while (x < w / 2 - 0.05) {
+        const type = rnd() < 0.55 ? 'can' : rnd() < 0.75 ? 'jar' : 'box'
+        const gap = type === 'box' ? 0.09 : 0.075
+        out.push({ lvl, x: x + gap / 2, z: -d / 2 + 0.08 + rnd() * Math.max(0.02, d - 0.2), type, c: Math.floor(rnd() * k.food.length) })
+        x += gap + 0.015
+      }
+    }
+    return out
+  }, [w, d, k.food.length])
+
+  return (
+    <group>
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => (
+        <mesh key={`${sx}${sz}`} material={f.blackSteel} position={[sx * (w / 2 - post), h / 2, sz * (d / 2 - post)]} castShadow>
+          <cylinderGeometry args={[post, post, h, 10]} />
+        </mesh>
+      ))}
+      {levelY.map((y, i) => <Box key={i} p={[0, y, 0]} s={[w - post * 2, shelfT, d - post * 2]} m={f.blackSteel} />)}
+      {/* Pakker og kasser */}
+      {boxes.map((b, i) => (
+        <group key={i} position={[b.x, levelY[b.lvl] + shelfT / 2 + b.bh / 2, b.z]} rotation={[0, b.rotY, 0]}>
+          <mesh material={cardboard[b.c]} castShadow><boxGeometry args={[b.bw, b.bh, b.bd]} /></mesh>
+        </group>
+      ))}
+      {/* Dåser og tørvarer */}
+      {cans.map((it, i) => {
+        const y = levelY[it.lvl] + shelfT / 2
+        const m = k.food[it.c]
+        if (it.type === 'can') return <mesh key={i} material={m} position={[it.x, y + 0.055, it.z]} castShadow><cylinderGeometry args={[0.034, 0.034, 0.11, 14]} /></mesh>
+        if (it.type === 'jar') return <mesh key={i} material={m} position={[it.x, y + 0.06, it.z]} castShadow><cylinderGeometry args={[0.032, 0.032, 0.12, 14]} /></mesh>
+        return <Box key={i} p={[it.x, y + 0.08, it.z]} s={[0.07, 0.16, 0.045]} m={m} />
+      })}
+    </group>
+  )
+}
 
 const velourMats = new Map<string, THREE.MeshPhysicalMaterial>()
 /** Velour: mat grundfarve + lys "sheen" i fibrenes retning giver den bløde glans på kanterne. */
@@ -3008,6 +3079,7 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'keyboardMouse': return <KeyboardMouse glow={it.color} />
     case 'dresser': return <Dresser w={it.w} h={it.height} d={it.d} color={it.color} fronts={it.fronts} legs={it.legs} drawers={it.count} />
     case 'bookshelf': return <Bookshelf w={it.w} h={it.height} d={it.d} color={it.color} />
+    case 'pantryShelf': return <PantryShelving w={it.w} d={it.d} h={it.height} />
     case 'dogBed': return <Box p={[0, 0.06, 0]} s={[0.9, 0.12, 0.65]} m={f.dogBed} />
     case 'rug': return <Box p={[0, 0.006, 0]} s={[it.w ?? 1, 0.012, it.d ?? 1]} m={colorMat(it.color ?? '#cfc5b4')} shadow={false} />
     default:
