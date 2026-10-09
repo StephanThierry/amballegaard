@@ -3,6 +3,38 @@ using System.Text.Json.Serialization;
 
 namespace Amballegaard.Simulation.Events;
 
+/// <summary>Gør at target kan skrives både som simpel streng ("dishwasher") eller objekt ({ kind, value }).</summary>
+public sealed class ActionTargetConverter : JsonConverter<ActionTarget>
+{
+    public override ActionTarget? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+        {
+            var str = reader.GetString() ?? "";
+            return new ActionTarget("point", str);
+        }
+
+        if (reader.TokenType == JsonTokenType.StartObject)
+        {
+            using var doc = JsonDocument.ParseValue(ref reader);
+            var root = doc.RootElement;
+            var kind = root.TryGetProperty("kind", out var k) ? k.GetString() ?? "point" : "point";
+            var val = root.TryGetProperty("value", out var v) ? v.GetString() ?? "" : "";
+            return new ActionTarget(kind, val);
+        }
+
+        return null;
+    }
+
+    public override void Write(Utf8JsonWriter writer, ActionTarget value, JsonSerializerOptions options)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("kind", value.Kind);
+        writer.WriteString("value", value.Value);
+        writer.WriteEndObject();
+    }
+}
+
 /// <summary>Understøttet schema-version for event-definitioner.</summary>
 public static class EventSchema
 {

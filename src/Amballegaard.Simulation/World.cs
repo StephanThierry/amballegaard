@@ -480,7 +480,7 @@ public sealed class World
     }
 
     internal void StartAgentPath(Agent agent, List<Vec2> path) => StartPath(agent, path);
-    
+
     internal void ClearAgentPath(Agent agent) => ClearPath(agent);
 
     /// <summary>Hold de døre åbne som beboeren er ved at gå igennem; slip dem igen bagefter.</summary>
@@ -494,7 +494,7 @@ public sealed class World
         }
     }
 
-    internal static void ClearPath(Agent agent)
+    internal void ClearPath(Agent agent)
     {
         agent.Target = null;
         agent.Path = null;
@@ -575,15 +575,24 @@ public void Tick(double realDt)
             StepWander(agent, realDt);
     }
 
-// I World.JumpToTimeOfDay(double hours):
-public void JumpToTimeOfDay(double hours)
-{
-    hours = Math.Clamp(hours, 0, 24);
-    var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
-    if (target <= SimTime) target += TimeSpan.FromDays(1);
-    SimTime = target;
+    // I World.JumpToTimeOfDay(double hours):
+    public void JumpToTimeOfDay(double hours)
+    {
+        hours = Math.Clamp(hours, 0, 24);
+        var target = TimeSpan.FromDays(Math.Floor(SimTime.TotalDays)) + TimeSpan.FromHours(hours);
+        if (target <= SimTime) target += TimeSpan.FromDays(1);
+        SimTime = target;
 
-    // Sørg for at trackeren bogfører tidsspringet korrekt uden at affyre fortidige noder
-    _timeTracker.FastForwardTo(SimTime, _eventNodes);
-}    
+        // Sørg for at trackeren bogfører tidsspringet korrekt uden at affyre fortidige noder
+        _timeTracker.FastForwardTo(SimTime, _eventNodes);
+    }    
+
+    /// <summary>Sætter en dør/hvidevares tilstand eksplicit til åben eller lukket (bruges af event-motorens interact-action).</summary>
+    public bool SetDoorState(string id, bool open)
+    {
+        var isOpen = _openDoors.Contains(id);
+        if (open && !isOpen) return ToggleDoor(id);
+        if (!open && isOpen) return ToggleDoor(id);
+        return true;
+    }
 }

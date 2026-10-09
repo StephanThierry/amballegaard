@@ -3,7 +3,6 @@ using Amballegaard.Simulation.House;
 
 namespace Amballegaard.Simulation.Events;
 
-/// <summary>Tilstand for en aktiv handling i en event-node.</summary>
 internal sealed class ActiveExecution
 {
     public required EventNode Node { get; init; }
@@ -11,12 +10,13 @@ internal sealed class ActiveExecution
     public double Timer { get; set; }
     public double RepathCooldown { get; set; }
     public Vec2? LastTargetPos { get; set; }
+
+    public double ChoreRemaining { get; set; }
+    public double ChorePauseRemaining { get; set; }
+    public int ChorePointIndex { get; set; }
+    public string? LastInteractedAppliance { get; set; }
 }
 
-/// <summary>
-/// Eksekverer dagsplan-grafer for beboerne (jf. dagsplan-motor.md §2–§6).
-/// Håndterer goto, speak, wait, setState, oncomplete-kæder og waitFor fan-in.
-/// </summary>
 public sealed class EventEngine
 {
     private readonly World _world;
@@ -32,7 +32,6 @@ public sealed class EventEngine
         _world = world;
     }
 
-    /// <summary>Indlæser noder i motorens opslagstabel.</summary>
     public void LoadNodes(IEnumerable<EventNode> nodes)
     {
         _nodes.Clear();
@@ -40,20 +39,18 @@ public sealed class EventEngine
             _nodes[(n.Person, n.Id)] = n;
     }
 
-    /// <summary>Nulstiller dagens gennemførte noder (kaldes ved dags-rearm).</summary>
     public void ResetDailyState()
     {
         _completedNodesToday.Clear();
         _pendingWaitFor.Clear();
     }
 
-    /// <summary>Starter eksekvering af en node for dens aktør.</summary>
     public bool StartNode(EventNode node)
     {
         var agent = _world.Agents.FirstOrDefault(a => a.Id == node.Person);
         if (agent is null || !agent.Active) return false;
 
-        // Tjek waitFor (fan-in): hvis forudsætningerne ikke er mødt endnu, venter vi
+        // Fan-in: tjek om forudsætninger i waitFor er opfyldt
         if (node.WaitFor is { Count: > 0 } waits)
         {
             var allDone = waits.All(w => _completedNodesToday.Contains((w.Person, w.Id)));
@@ -66,8 +63,32 @@ public sealed class EventEngine
             _pendingWaitFor.Remove(node);
         }
 
-        // Afbryd evt. tidligere igangværende rute og tilfældig snak
-        _world.ClearAgentPath(agent);
+        // Øjeblikkelige handlinger (setState og interact) jf. dagsplan-motor.md §4
+        if (node.Action.Type == "setState")
+        {
+            if (!string.IsNullOrWhiteSpace(node.Action.Activity))
+                agent.Activity = node.Action.Activity;
+
+            _completedNodesToday.Add((node.Person, node.Id));
+            TriggerOncomplete(node, agent);
+            CheckPendingWaitFors();
+            return true;
+        }
+
+        if (node.Action.Type == "interact")
+        {
+            var targetId = node.Action.Target?.Value ?? "";
+            var wantOpen = string.Equals(node.Action.State, "open", StringComparison.OrdinalIgnoreCase);
+            _world.SetDoorState(targetId, wantOpen);
+
+            _completedNodesToday.Add((node.Person, node.Id));
+            TriggerOncomplete(node, agent);
+            CheckPendingWaitFors();
+            return true;
+        }
+
+        // Tidsbaserede handlinger (goto, speak, wait, chore)
+        _world.ClearPath(agent);
         agent.InEvent = true;
         agent.CurrentEventChain = node.Chain;
 
@@ -107,11 +128,14 @@ public sealed class EventEngine
                 agent.Activity = "idle";
                 break;
 
-            case "setState":
+            case "chore":
+                var choreTime = exec.Node.Duration?.Min ?? (action.Duration?.Min ?? 45.0);
+                exec.ChoreRemaining = choreTime;
+                exec.ChorePauseRemaining = 0;
+                exec.ChorePointIndex = 0;
                 if (!string.IsNullOrWhiteSpace(action.Activity))
                     agent.Activity = action.Activity;
-                // setState er øjeblikkelig (0 sekunder)
-                exec.Timer = 0;
+                PlanChoreStep(exec);
                 break;
         }
     }
@@ -156,6 +180,21 @@ public sealed class EventEngine
         }
     }
 
+    private void PlanChoreStep(ActiveExecution exec)
+    {
+        var points = exec.Node.Action.Points;
+        if (points is null || points.Count == 0) return;
+
+        var ptId = points[exec.ChorePointIndex % points.Count];
+        var app = _world.House.Appliances.FirstOrDefault(a => a.Id == ptId);
+        if (app is not null)
+        {
+            var path = _world.Nav.FindPath(exec.Agent.Position, app.Stand);
+            if (path is { Count: > 0 })
+                _world.StartAgentPath(exec.Agent, path);
+        }
+    }
+
     public void Tick(double dt)
     {
         var finished = new List<ActiveExecution>();
@@ -164,7 +203,6 @@ public sealed class EventEngine
         {
             if (!exec.Agent.Active)
             {
-                // Hvis agenten er blevet deaktiveret, dør noden jf. §6
                 finished.Add(exec);
                 continue;
             }
@@ -179,7 +217,6 @@ public sealed class EventEngine
             CompleteNode(exec);
         }
 
-        // Tjek om noder med waitFor nu kan starte
         CheckPendingWaitFors();
     }
 
@@ -194,18 +231,16 @@ public sealed class EventEngine
                 if (action.Target?.Kind == "person")
                 {
                     var other = _world.Agents.FirstOrDefault(a => a.Id == action.Target.Value);
-                    if (other is null || !other.Active) return true; // Mål forsvundet
+                    if (other is null || !other.Active) return true;
 
-                    // "Ved goto person skal man være i samme rum og 1m eller mindre fra personen" (jf. §4)
                     var sameRoom = agent.RoomId != "" && agent.RoomId == other.RoomId;
                     var dist = Vec2.Distance(agent.Position, other.Position);
                     if (sameRoom && dist <= 1.0)
                     {
-                        _world.ClearAgentPath(agent);
+                        _world.ClearPath(agent);
                         return true;
                     }
 
-                    // Dynamisk genberegning hvis målet har flyttet sig
                     exec.RepathCooldown -= dt;
                     if (exec.RepathCooldown <= 0)
                     {
@@ -220,13 +255,11 @@ public sealed class EventEngine
 
                 if (action.Target?.Kind == "room")
                 {
-                    // "Ved goto værelse skal man bare være tæt på centrum / ankommet"
                     if (agent.RoomId == action.Target.Value && agent.Target is null)
                         return true;
                     return agent.Target is null;
                 }
 
-                // point eller generelt: færdig når stien er gået færdig
                 return agent.Target is null;
 
             case "speak":
@@ -237,8 +270,25 @@ public sealed class EventEngine
                 exec.Timer -= dt;
                 return exec.Timer <= 0;
 
-            case "setState":
-                return true;
+            case "chore":
+                exec.ChoreRemaining -= dt;
+                if (exec.ChoreRemaining <= 0)
+                {
+                    _world.ClearPath(agent);
+                    return true;
+                }
+
+                if (agent.Target is null)
+                {
+                    exec.ChorePauseRemaining -= dt;
+                    if (exec.ChorePauseRemaining <= 0)
+                    {
+                        exec.ChorePauseRemaining = 2.0;
+                        exec.ChorePointIndex++;
+                        PlanChoreStep(exec);
+                    }
+                }
+                return false;
 
             default:
                 return true;
@@ -251,23 +301,26 @@ public sealed class EventEngine
         _completedNodesToday.Add(key);
         _activeByPerson.Remove(exec.Agent.Id);
 
-        // Udløs fan-out via oncomplete
-        var nextNodesToStart = new List<EventNode>();
-        foreach (var nextRef in exec.Node.Oncomplete)
+        TriggerOncomplete(exec.Node, exec.Agent);
+    }
+
+    private void TriggerOncomplete(EventNode node, Agent agent)
+    {
+        var nextNodes = new List<EventNode>();
+        foreach (var nextRef in node.Oncomplete)
         {
             if (_nodes.TryGetValue((nextRef.Person, nextRef.Id), out var nextNode))
-                nextNodesToStart.Add(nextNode);
+                nextNodes.Add(nextNode);
         }
 
-        // Hvis agenten ikke umiddelbart fortsætter i en ny handling, frigives den
-        var agentHasNextImmediate = nextNodesToStart.Any(n => n.Person == exec.Agent.Id);
-        if (!agentHasNextImmediate)
+        var agentHasNext = nextNodes.Any(n => n.Person == agent.Id);
+        if (!agentHasNext && !_activeByPerson.ContainsKey(agent.Id))
         {
-            exec.Agent.InEvent = false;
-            exec.Agent.CurrentEventChain = null;
+            agent.InEvent = false;
+            agent.CurrentEventChain = null;
         }
 
-        foreach (var next in nextNodesToStart)
+        foreach (var next in nextNodes)
         {
             StartNode(next);
         }
@@ -288,14 +341,18 @@ public sealed class EventEngine
         }
     }
 
-    /// <summary>Afbryder øjeblikkeligt en persons handling, hvis brugeren trækker i den (jf. §6).</summary>
     public void CancelAgent(string agentId)
     {
         if (_activeByPerson.Remove(agentId, out var exec))
         {
+            if (exec.LastInteractedAppliance is not null)
+            {
+                _world.SetDoorState(exec.LastInteractedAppliance, false);
+            }
+
             exec.Agent.InEvent = false;
             exec.Agent.CurrentEventChain = null;
-            _world.ClearAgentPath(exec.Agent);
+            _world.ClearPath(exec.Agent);
         }
     }
 }

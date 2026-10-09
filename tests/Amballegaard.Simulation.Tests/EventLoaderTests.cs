@@ -45,7 +45,8 @@ public class EventLoaderTests
         {
             new()
             {
-                Person = "stephan", Id = "orphan_node",
+                Person = "stephan",
+                Id = "orphan_node",
                 Trigger = new() { Type = "passive" },
                 Action = new() { Type = "wait", Seconds = 5 }
             }
@@ -63,8 +64,9 @@ public class EventLoaderTests
         {
             new()
             {
-                Person = "stephan", Id = "root",
-                Trigger = new() { Type = "time", "value": "08:00" },
+                Person = "stephan",
+                Id = "root",
+                Trigger = new() { Type = "time", Value = "08:00" },
                 Action = new() { Type = "wait", Seconds = 5 },
                 Oncomplete = [new() { Person = "stephan", Id = "non_existing" }]
             }
@@ -82,14 +84,16 @@ public class EventLoaderTests
         {
             new()
             {
-                Person = "stephan", Id = "A",
+                Person = "stephan",
+                Id = "A",
                 Trigger = new() { Type = "time", Value = "08:00" },
                 Action = new() { Type = "wait", Seconds = 1 },
                 Oncomplete = [new() { Person = "stephan", Id = "B" }]
             },
             new()
             {
-                Person = "stephan", Id = "B",
+                Person = "stephan",
+                Id = "B",
                 Trigger = new() { Type = "passive" },
                 Action = new() { Type = "wait", Seconds = 1 },
                 Oncomplete = [new() { Person = "stephan", Id = "A" }]
@@ -108,20 +112,22 @@ public class EventLoaderTests
         {
             new()
             {
-                Person = "stephan", Id = "T1",
+                Person = "stephan",
+                Id = "T1",
                 Trigger = new() { Type = "time", Value = "08:00" },
                 Action = new() { Type = "wait", Seconds = 1 }
             },
             new()
             {
-                Person = "stephan", Id = "T2",
+                Person = "stephan",
+                Id = "T2",
                 Trigger = new() { Type = "time", Value = "08:00" },
                 Action = new() { Type = "wait", Seconds = 1 }
             }
         };
 
         var report = EventValidator.Validate(nodes, CreateTestIndex());
-        Assert.True(report.IsValid); // Warnings gør den ikke ugyldig
+        Assert.True(report.IsValid);
         Assert.Contains(report.Warnings, w => w.Message.Contains("Flere time-triggers"));
     }
 
@@ -132,7 +138,8 @@ public class EventLoaderTests
         {
             new()
             {
-                Person = "stephan", Id = "G1",
+                Person = "stephan",
+                Id = "G1",
                 Trigger = new() { Type = "time", Value = "08:00" },
                 Action = new() { Type = "goto", Target = new("room", "non_existing_room") }
             }
@@ -154,7 +161,8 @@ public class EventLoaderTests
             File.WriteAllText(Path.Combine(tempDir, "stephan.json"), """
             [
               {
-                "person": "stephan", "id": "1",
+                "person": "stephan",
+                "id": "1",
                 "trigger": { "type": "time", "value": "07:00" },
                 "action": { "type": "wait", "seconds": 10 }
               }
