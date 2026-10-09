@@ -255,3 +255,106 @@ udfoldet her; skal færdiggøres ved implementering.)
    dæk (a) at et event udløses præcis én gang/dag, også ved høj `TimeScale` og efter
    `JumpToTimeOfDay`, (b) at alle deltagere ender rigtigt sted med rigtig `Activity`, (c) at en
    bruger-afbrydelse (drag/`SetActive`) midt i et event rydder op uden at nogen sidder fast.
+9. Tidspanel-UI og tidsforskydning med resolve (afsnit 13) — separat delopgave, kan komme efter
+   trin 1-5 er på plads, da resolve-mekanismen forudsætter at event-grafen og dens varigheder
+   allerede findes.
+
+## 13. Tidspanel-UI og tidsforskydning (resolve-on-jump)
+
+Aftalt med brugeren 2026-10-09, oven på grundmodellen i afsnit 1-12. Ændrer både UI'et
+(`web/src/ui/Hud.tsx`) og tilføjer et nyt stykke serverlogik (tidsforskydning med
+tilstands-resolve), som ikke fandtes i den oprindelige plan.
+
+### 13.1 Ny tidspanel-UI
+
+I dag (`Hud.tsx`): `SPEEDS = [1, 60, 300, 1200]` + pause + "Spring til solopgang/solnedgang"
+(`JumpToTimeOfDay`, altid fremad — kommentaren i `World.cs` siger eksplicit "tiden går aldrig
+baglæns"). Erstattes af:
+
+- **Pause / 1× / 2×** — kun disse tre. Vigtig forskel fra i dag: **2× skal betyde at avatarerne
+  rent faktisk bevæger sig dobbelt så hurtigt**, ikke (som i dag) at uret løber hurtigere mens
+  avatarerne går i deres sædvanlige realtids-tempo. `StepWander`'s bevægelsesskridt
+  (`agent.Speed * dt`, hvor `dt` i dag er **realDt**, uanset `TimeScale`) skal ganges med
+  `TimeScale` for at opnå det — en adfærdsændring i eksisterende kode, ikke kun UI. De gamle
+  høje multiplikatorer (60×/300×/1200×, "spol dagen hurtigt frem mens avatarerne går normalt") giver
+  ikke mening længere, for der er nu et separat værktøj til at springe i tid (næste punkt).
+- **-30 min / +30 min** — ny, **relativ** tidsforskydning, i modsætning til dagens absolutte,
+  kun-fremad `JumpToTimeOfDay`. `-30 min` kræver at `SimTime` reelt kan **gå baglæns** — det bryder
+  eksplicit med den nuværende invariant og skal ændres i `World.cs`, ikke kun i klienten. Kræver
+  formentlig en ny RPC, fx `ShiftTime(minutes)` (kan være negativ), adskilt fra `JumpToTimeOfDay`.
+
+**Åbent**: bevares "Spring til solopgang/solnedgang"? De har i dag præcis det samme problem som
+±30 min-knapperne skal løse (abrupt tidsspring efterlader avatarerne i en forældet tilstand) — hvis
+de bevares, bør de route gennem samme resolve-mekanisme (13.3), ikke blot kalde `JumpToTimeOfDay`
+som i dag.
+
+### 13.2 Hvorfor et tidsspring kræver resolve, ikke bare at ændre `SimTime`
+
+Et spring i `SimTime` alene efterlader hver agent fysisk der, hvor den stod **før** springet, selvom
+klokken nu siger noget andet — det ser forkert ud (barnet står midt i stuen kl. 23:00) og er direkte
+forkert for alle der er inde i en event-kæde (en der var på vej i seng kl. 19:35 skal efter et spring
+til 20:00 **stå i deres eget værelse og sove**, ikke stadig være på vej gennem badeværelset).
+Derfor skal et tidsspring trigge en **genberegning (resolve) af hver persons tilstand** ud fra deres
+egen event-graf (afsnit 3), ikke blot flytte uret.
+
+### 13.3 Resolve-mekanismen: analytisk gennemgang af grafen, ikke tick-for-tick-afspilning
+
+For hver person, ved ethvert tidsspring (±30 min, og evt. solopgang/solnedgang hvis de bevares):
+
+1. Gå gennem personens event-graf fra dagens relevante tidstriggede rod-node(r), og **akkumulér
+   varighed pr. node** indtil den samlede tid passerer måltidspunktet:
+   - `goto`: varighed = stifindingsafstand (NavGrid) ÷ `agent.Speed` — beregnes **geometrisk**, ikke
+     ved at simulere bevægelsen tick for tick.
+   - `wait`/`chore`: fast varighed, eller jitret (`duration.min`/`max`).
+   - `speak`: replikkens visningstid.
+   - `setState`/`interact`: øjeblikkelig (0 sekunder).
+2. Den node hvor den akkumulerede tid passerer måltidspunktet er **"aktiv" ved måltidspunktet**. Er
+   det en `goto` midt i forløbet, interpolér positionen langs stien ud fra hvor stor en andel af
+   nodens varighed der er gået.
+3. Snap agenten direkte til den beregnede tilstand (position + `Activity`) — ingen animeret gang,
+   springet skal opleves som øjeblikkeligt.
+
+**Determinisme er afgørende**: jitrede varigheder (`wait`/`chore`) må **ikke** trække et nyt
+tilfældigt tal for hvert resolve-kald — ellers giver gentagne -30/+30-klik ikke samme resultat igen
+(man kan ikke springe frem og så tilbage og lande samme sted). Jitter skal seedes deterministisk pr.
+node-instans (fx af dato + person + node-id), så resolve er en **ren funktion** af måltidspunktet.
+
+Dette dækker kun personer der rent faktisk er inde i en event-kæde på måltidspunktet (en
+tidstrigget rod er fyret, og kæden er endnu ikke afsluttet). Er ingen rod-node relevant endnu, eller
+er kæden allerede afsluttet, falder personen tilbage til fri vandre-tilstand — se 13.4.
+
+### 13.4 Fallback for frit vandrende beboere: tving en synlig ændring
+
+Hvis resolve (13.3) viser at personen **ikke** er styret af en aktiv event-node ved måltidspunktet,
+**og** personens `Activity` er en "roaming"-tilstand (`idle`/`walk`): teleportér (ikke gå) til en ny
+tilfældig gyldig position, udelukkende så tidsspringet er synligt for brugeren — ellers kan et
+30-minutters spring se ud som om intet skete. Genbrug samme mønster som andre teleports
+(`NavGrid.NearestWalkable`, jf. `MoveAgent`).
+
+### 13.5 Undtagelse: "parkerede" aktiviteter må aldrig flyttes
+
+"Selvfølgelig ingen ny position hvis tilstanden er identisk i placering" — fx siddende ved
+spisebordet, eller i seng og sover. Dette kræver en lille klassificering af hver `Activity`-værdi:
+
+- **roaming**: `idle`, `walk` — må randomiseres af 13.4.
+- **parked**: `sleeping`, `eating`, `tidying`, og fremtidige lignende tilstande — randomiseres
+  **aldrig**, uanset om personen er inde i en aktiv event-node eller "bare" efterladt i tilstanden
+  efter at en kæde er afsluttet. Deres position er semantisk bundet til aktiviteten (seng,
+  spisebord) — at flytte dem ville være direkte forkert, ikke blot unødvendigt.
+
+### 13.6 Afgrænsning: kun agent-tilstand, ikke verdens-objekter
+
+Resolve dækker **kun** agentens position/`Activity` — **ikke** verdens-objekttilstande (åbne døre,
+tændte lamper, `_lampLevels`, en opvaskemaskines åben/lukket-tilstand fra en `interact`-handling).
+De forbliver upåvirket af et tidsspring, præcis som de er upåvirket af `JumpToTimeOfDay` i dag.
+Bevidst afgrænsning — ikke overset.
+
+### 13.7 Åbne spørgsmål
+
+- Bevares "Spring til solopgang/solnedgang", og skal de i så fald route gennem resolve-mekanismen
+  (13.3) i stedet for blot at kalde `JumpToTimeOfDay` som i dag?
+- Hvad sker der med dags-instansbogføringen (afsnit 5) når en **tilbage**-forskydning krydser
+  midnat? Simplest: lad `-30 min` ikke kunne krydse tilbage over midnat (clamp ved 00:00); en fuld
+  løsning (genskabe gårsdagens instans) er ikke nødvendig for den oprindelige forespørgsel.
+- Ny RPC: `ShiftTime(minutes)` (signeret, kan være negativ) — adskilt fra `JumpToTimeOfDay`, som
+  forbliver absolut og fremad-kun til sine nuværende formål (hvis den bevares, jf. punkt 1 ovenfor).
