@@ -16,14 +16,14 @@ public class HouseModelTests
     {
         var house = Load();
         Assert.Equal(15, house.Rooms.Count);
-        Assert.Contains(house.Rooms, r => r.Id == "stue");
+        Assert.Contains(house.Rooms, r => r.Id == "living_room");
     }
 
     [Theory]
-    [InlineData("stue", 4.41, 7.33)]
+    [InlineData("living_room", 4.41, 7.33)]
     [InlineData("garage", 7.62, 6.59)]
-    [InlineData("v2", 3.33, 3.04)]
-    [InlineData("walkin", 2.08, 2.33)]
+    [InlineData("maxemils_bedroom", 3.33, 3.04)]
+    [InlineData("walk_in_closet", 2.08, 2.33)]
     public void Room_sizes_match_floorplan_labels_within_tolerance(string id, double width, double depth)
     {
         var (min, max) = Load().Rooms.Single(r => r.Id == id).Bounds();
@@ -117,8 +117,8 @@ public class HouseModelTests
         Assert.True(world.MoveAgent("maxemil", new Vec2(17.8, 11.8))); // stuen
         world.Tick(0.1);
         var max = world.Agents.Single(a => a.Id == "maxemil");
-        Assert.Equal("stue", max.RoomId);
-        Assert.Equal("stue", max.WanderRoomId);
+        Assert.Equal("living_room", max.RoomId);
+        Assert.Equal("living_room", max.WanderRoomId);
     }
 
     [Fact]
@@ -340,12 +340,12 @@ public class HouseModelTests
         for (var i = 0; i < 20000 && !opened; i++)
         {
             world.Tick(0.1);
-            opened = world.OpenDoors.Contains("koeleskab") || world.OpenDoors.Contains("fryser");
+            opened = world.OpenDoors.Contains("fridge") || world.OpenDoors.Contains("freezer");
         }
         Assert.True(opened, "Ingen åbnede køleskab eller fryser");
         Assert.Contains(world.Agents, a => a.Speech is not null &&
             (Speech.FridgeLines.Contains(a.Speech) || Speech.FreezerLines.Contains(a.Speech)));
-        Assert.True(world.ToggleDoor("koeleskab"));
+        Assert.True(world.ToggleDoor("fridge"));
     }
 
     [Fact]
@@ -366,11 +366,11 @@ public class HouseModelTests
     public void Bedside_lamp_cycles_off_half_full()
     {
         var world = new World(Load(), Family.Create());
-        Assert.Equal(0, world.LampLevels.GetValueOrDefault("lampe-nord"));
-        world.ToggleDoor("lampe-nord"); Assert.Equal(50, world.LampLevels["lampe-nord"]);
-        world.ToggleDoor("lampe-nord"); Assert.Equal(100, world.LampLevels["lampe-nord"]);
-        world.ToggleDoor("lampe-nord"); Assert.Equal(0, world.LampLevels["lampe-nord"]);
-        Assert.DoesNotContain("lampe-nord", world.OpenDoors);
+        Assert.Equal(0, world.LampLevels.GetValueOrDefault("lamp_north"));
+        world.ToggleDoor("lamp_north"); Assert.Equal(50, world.LampLevels["lamp_north"]);
+        world.ToggleDoor("lamp_north"); Assert.Equal(100, world.LampLevels["lamp_north"]);
+        world.ToggleDoor("lamp_north"); Assert.Equal(0, world.LampLevels["lamp_north"]);
+        Assert.DoesNotContain("lamp_north", world.OpenDoors);
     }
 
     private static double DistanceToSegment(Vec2 p, Vec2 a, Vec2 b)

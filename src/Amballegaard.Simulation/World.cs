@@ -469,7 +469,7 @@ public sealed class World
         }
         if (roll < 0.3)
         {
-            var candidates = House.Rooms.Where(r => r.Id != roomId && r.Id is not ("tek" or "vikt")).ToList();
+            var candidates = House.Rooms.Where(r => r.Id != roomId && r.Id is not ("technical_room" or "pantry")).ToList();
             roomId = candidates[_rng.Next(candidates.Count)].Id;
         }
         else if (roll < 0.5 && agent.WanderRoomId != agent.HomeRoomId)

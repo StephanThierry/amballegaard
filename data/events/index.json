@@ -1,0 +1,228 @@
+{
+  "rooms": [
+    {
+      "id": "entrance_hall",
+      "name": "Entr\u00E9"
+    },
+    {
+      "id": "garage",
+      "name": "Garage"
+    },
+    {
+      "id": "kids_bathroom",
+      "name": "Badev\u00E6relse"
+    },
+    {
+      "id": "kitchen_family_room",
+      "name": "K\u00F8kken/alrum"
+    },
+    {
+      "id": "laundry_room",
+      "name": "Bryggers"
+    },
+    {
+      "id": "lisas_office",
+      "name": "Lisas kontor"
+    },
+    {
+      "id": "living_room",
+      "name": "Stue"
+    },
+    {
+      "id": "master_bathroom",
+      "name": "Badev\u00E6relse (master)"
+    },
+    {
+      "id": "master_bedroom",
+      "name": "Sovev\u00E6relse"
+    },
+    {
+      "id": "mathildes_bedroom",
+      "name": "Mathildes v\u00E6relse"
+    },
+    {
+      "id": "maxemils_bedroom",
+      "name": "Max-Emils v\u00E6relse"
+    },
+    {
+      "id": "pantry",
+      "name": "Viktualie"
+    },
+    {
+      "id": "stephans_office",
+      "name": "Stephans kontor"
+    },
+    {
+      "id": "technical_room",
+      "name": "Teknik"
+    },
+    {
+      "id": "walk_in_closet",
+      "name": "Walk-in"
+    }
+  ],
+  "persons": [
+    {
+      "id": "hund",
+      "name": "Hund",
+      "kind": "Dog",
+      "homeRoomId": "kitchen_family_room"
+    },
+    {
+      "id": "lisa",
+      "name": "Lisa",
+      "kind": "Adult",
+      "homeRoomId": "lisas_office"
+    },
+    {
+      "id": "mathilde",
+      "name": "Mathilde",
+      "kind": "Child",
+      "homeRoomId": "mathildes_bedroom"
+    },
+    {
+      "id": "maxemil",
+      "name": "Max-Emil",
+      "kind": "Child",
+      "homeRoomId": "maxemils_bedroom"
+    },
+    {
+      "id": "stephan",
+      "name": "Stephan",
+      "kind": "Adult",
+      "homeRoomId": "master_bedroom"
+    }
+  ],
+  "points": [
+    {
+      "id": "ceiling_light_master_bathroom",
+      "kind": "ceilingLight",
+      "roomId": "master_bathroom"
+    },
+    {
+      "id": "dishwasher",
+      "kind": "dishwasher",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "dryer_door",
+      "kind": "dryerDoor",
+      "roomId": "laundry_room"
+    },
+    {
+      "id": "freezer",
+      "kind": "freezer",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "freezer_drawer_1",
+      "kind": "freezerDrawer",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "freezer_drawer_2",
+      "kind": "freezerDrawer",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "freezer_drawer_3",
+      "kind": "freezerDrawer",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "freezer_drawer_4",
+      "kind": "freezerDrawer",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "fridge",
+      "kind": "fridge",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "garage_wardrobe",
+      "kind": "wardrobe",
+      "roomId": "garage"
+    },
+    {
+      "id": "kitchen_tap",
+      "kind": "tap",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "lamp_north",
+      "kind": "lamp",
+      "roomId": "master_bedroom"
+    },
+    {
+      "id": "lamp_south",
+      "kind": "lamp",
+      "roomId": "master_bedroom"
+    },
+    {
+      "id": "laundry_room_wardrobe",
+      "kind": "wardrobe",
+      "roomId": "laundry_room"
+    },
+    {
+      "id": "lisas_sofa_bed",
+      "kind": "sofaBed",
+      "roomId": "lisas_office"
+    },
+    {
+      "id": "mathildes_wardrobe",
+      "kind": "wardrobe",
+      "roomId": "mathildes_bedroom"
+    },
+    {
+      "id": "maxemils_wardrobe",
+      "kind": "wardrobe",
+      "roomId": "maxemils_bedroom"
+    },
+    {
+      "id": "oven_1",
+      "kind": "oven",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "oven_2",
+      "kind": "oven",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "stephans_wardrobe",
+      "kind": "wardrobe",
+      "roomId": "stephans_office"
+    },
+    {
+      "id": "stove",
+      "kind": "stove",
+      "roomId": "kitchen_family_room"
+    },
+    {
+      "id": "toilet_kids_bathroom",
+      "kind": "toiletLid",
+      "roomId": "kids_bathroom"
+    },
+    {
+      "id": "toilet_master_bathroom",
+      "kind": "toiletLid",
+      "roomId": "master_bathroom"
+    },
+    {
+      "id": "tv_living_room",
+      "kind": "tv",
+      "roomId": "living_room"
+    },
+    {
+      "id": "tv_master_bedroom",
+      "kind": "tv",
+      "roomId": "master_bedroom"
+    },
+    {
+      "id": "washer_door",
+      "kind": "washerDoor",
+      "roomId": "laundry_room"
+    }
+  ]
+}

@@ -28,7 +28,7 @@ event-filer ud fra — se afsnit 9.
   Der findes allerede en løs replik til opvaskemaskinen (`"Jeg tømmer lige opvaskeren."`).
 - **`house.json` appliance `standAt`** — mønsteret for navngivne ståpunkter genbruges til `goto`
   med `kind: "point"` og til at undgå at flere beboere lander oven i hinanden i et lille rum (fx
-  `badN`, det lille badeværelse mellem Max-Emils og Mathildes værelser).
+  `kids_bathroom`, det lille badeværelse mellem Max-Emils og Mathildes værelser).
 
 ## 2. Kerneidé: graf af `EventNode` pr. person, ikke "schedule-fil + delt event-fil"
 
@@ -191,7 +191,7 @@ udtømmende **kontrakt** en LLM skriver event-filer ud fra, og skal dække præc
      13.3, ellers bryder tidsforskydnings-resolve.
 
 Indeholder desuden `schemaVersion`-feltet (afsnit 8), 2-3 fuldt udfoldede eksempelfiler som
-skabelon (afsnit 10), advarsel om pladstrængsel i små rum (`badN`), og den eksplicitte regel om
+skabelon (afsnit 10), advarsel om pladstrængsel i små rum (`kids_bathroom`), og den eksplicitte regel om
 ingen tvungen kæde-gennemførsel (afsnit 6).
 
 ### 9.2 ID-indeks — ét lokalt opslagsfil for alle gyldige id'er
@@ -203,9 +203,9 @@ event-fil kan referere til:
 
 ```
 {
-  "rooms":   [ { "id": "badN", "name": "Badeværelse" }, ... ],
-  "persons": [ { "id": "maxemil", "name": "Max-Emil", "kind": "Child", "homeRoomId": "v2" }, ... ],
-  "points":  [ { "id": "koekkenoe-opvask", "kind": "dishwasher", "roomId": "koekken" }, ... ]
+  "rooms":   [ { "id": "kids_bathroom", "name": "Badeværelse" }, ... ],
+  "persons": [ { "id": "maxemil", "name": "Max-Emil", "kind": "Child", "homeRoomId": "maxemils_bedroom" }, ... ],
+  "points":  [ { "id": "dishwasher", "kind": "dishwasher", "roomId": "kitchen_family_room" }, ... ]
 }
 ```
 
@@ -242,11 +242,11 @@ event-fil kan referere til:
   ] }
 
 { person: "maxemil", id: "TOBED-1", trigger: { type: "passive" },
-  action: { type: "goto", target: { kind: "point", value: "badN" } },
+  action: { type: "goto", target: { kind: "room", value: "kids_bathroom" } },
   oncomplete: [] }
 
 { person: "stephan", id: "TOBED-16", trigger: { type: "passive" },
-  action: { type: "goto", target: { kind: "point", value: "badN" } },
+  action: { type: "goto", target: { kind: "room", value: "kids_bathroom" } },
   oncomplete: [] }
 ```
 
@@ -258,20 +258,20 @@ udfoldet her; skal færdiggøres ved implementering.)
 
 ```
 { person: "lisa", id: "OPVASK30", trigger: { type: "time", value: "08:00" },
-  action: { type: "goto", target: { kind: "point", value: "koekkenoe-opvask" } },
+  action: { type: "goto", target: { kind: "point", value: "dishwasher" } },
   oncomplete: [ { person: "lisa", id: "OPVASK31" } ] }
 
 { person: "lisa", id: "OPVASK31", trigger: { type: "passive" },
-  action: { type: "interact", target: "koekkenoe-opvask", state: "open" },
+  action: { type: "interact", target: "dishwasher", state: "open" },
   oncomplete: [ { person: "lisa", id: "OPVASK32" } ] }
 
 { person: "lisa", id: "OPVASK32", trigger: { type: "passive" },
-  action: { type: "chore", points: ["koekkenoe-opvask", "koekkenoe-skab"],
+  action: { type: "chore", points: ["dishwasher", "kitchen_cabinet"],
             activity: "tidying", duration: { min: 40, max: 70 } },
   oncomplete: [ { person: "lisa", id: "OPVASK33" } ] }
 
 { person: "lisa", id: "OPVASK33", trigger: { type: "passive" },
-  action: { type: "interact", target: "koekkenoe-opvask", state: "closed" },
+  action: { type: "interact", target: "dishwasher", state: "closed" },
   oncomplete: [] }
 ```
 

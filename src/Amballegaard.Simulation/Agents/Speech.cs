@@ -7,7 +7,7 @@ public enum SpeakerFilter { Anyone, Adult, Child, Specific }
 /// En replik. De fleste er "spontane udbrud" (<see cref="Responses"/> er null) som siges uden videre.
 /// Har den <see cref="Responses"/>, er den i stedet en "samtale": kræver mindst én anden beboer i samme
 /// rum, som så stopper op og svarer med en tilfældig replik fra listen — se World.StepSpeech.
-/// <see cref="Rooms"/> (husets rum-id'er, fx "stue"/"master") begrænser hvor replikken kan siges; null
+/// <see cref="Rooms"/> (husets rum-id'er, fx "living_room"/"master_bedroom") begrænser hvor replikken kan siges; null
 /// betyder alle rum (inkl. udenfor).
 /// </summary>
 public sealed record SpeechLine(
@@ -49,9 +49,9 @@ public static class Speech
         new("Husk at lukke terrassedøren!"),
         new("Den brændeovn er bare så hyggelig."),
         new("Jeg er SÅ mæt."),
-        InRooms("Hvem har slæbt mudder ind i entréen?", "bryggers", "entre"),
-        InRooms("Gad vide om der er nogen gode serier jeg skal se…", "stue"),
-        InRooms("Jeg skal tidligt i seng i dag.", "master"),
+        InRooms("Hvem har slæbt mudder ind i entréen?", "laundry_room", "entrance_hall"),
+        InRooms("Gad vide om der er nogen gode serier jeg skal se…", "living_room"),
+        InRooms("Jeg skal tidligt i seng i dag.", "master_bedroom"),
         new("Uhm, det dufter godt herinde!"),
         new("Vi skal huske at købe mælk."),
         new("Det er rart at være hjemme."),
@@ -123,30 +123,30 @@ public static class Speech
             ["Ja! Jeg vælger popcorn.", "Kun hvis det ikke er gyser.", "Jeg faldt i søvn sidste gang, men ja.", "Lad os se noget på Streamberry."]),
         Convo("Skal vi spille PlayStation sammen?",
             ["Jeg er midt i Demon's Souls, men okay.", "Ja! Jeg har lige fået et nyt våben i Horizon.", "Kun hvis du lader mig vinde.", "Bare ikke for længe."],
-            rooms: ["stue"]),
+            rooms: ["living_room"]),
         Convo("Vil du spille fodbold med mig i haven?",
             ["Ja, giv mig to minutter!", "Kun hvis jeg må være målmand.", "Jeg er lidt træt, men okay.", "Spørg lige din søster også!"],
             SpeakerFilter.Child),
         Convo("Skal vi tænde op i brændeovnen?",
             ["Ja, perfekt vejr til det.", "God idé, jeg fryser.", "Kun hvis du henter brænde — LOL, det er gas."],
-            rooms: ["stue"]),
+            rooms: ["living_room"]),
         Convo("Skal vi grille i aften?",
             ["Ja! Hvad skal vi smide på.", "Kun hvis vejret holder.", "God idé, jeg er træt af at lave mad indenfor.", "Vi mangler gas til grillen, tror jeg."]),
         Convo("Skal vi ud og nyde terrassen lidt?",
             ["Ja, det er skønt vejr!", "Lige om lidt.", "Kun hvis vi tager kaffe med.", "Er det ikke lidt koldt?"]),
         Convo("Vil du se mit nye maleri?",
             ["Ja, det vil jeg meget gerne!", "Wow, det tager sig flot ud!", "Er det snart færdigt?", "Jeg kommer om lidt."],
-            SpeakerFilter.Specific, agentId: "lisa", rooms: ["vaerV"]),
+            SpeakerFilter.Specific, agentId: "lisa", rooms: ["lisas_office"]),
         Convo("Skal jeg sætte noget god musik på anlægget?",
             ["Ja tak, noget roligt.", "Endelig, det anlæg skal da bruges!", "Bare ikke for højt.", "Ja! Sæt noget op-tempo på."],
-            SpeakerFilter.Specific, agentId: "stephan", rooms: ["stue"]),
+            SpeakerFilter.Specific, agentId: "stephan", rooms: ["living_room"]),
         Convo("Skal vi bestille pizza i aften?",
             ["JA ENDELIG!", "Igen? Men okay…", "Kun hvis børnene vælger topping.", "God idé, jeg gider ikke lave mad."]),
         Convo("Skal vi tage en gåtur?",
             ["Ja, frisk luft lyder dejligt!", "Kun en kort en, det er sent.", "Ja, jeg skal alligevel over til de gamle?", "Lige om lidt.", "Ja, så kan vi hente den pakke i SuperBrugsen."]),
         Convo("Kan du hjælpe mig med at dække bord?",
             ["Ja, kommer nu!", "To minutter, jeg er snart færdig.", "Kan ikke en anden gøre det for en gangs skyld?", "Selvfølgelig!"],
-            rooms: ["alrum"]),
+            rooms: ["kitchen_family_room"]),
         Convo("Skal vi bage sammen i weekenden?",
             ["Ja! Jeg vil gerne lave boller.", "Kun hvis jeg må slikke skålen.", "God idé, lad os finde en opskrift.", "Jeg er ikke god til at bage, men okay!"]),
     ];

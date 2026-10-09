@@ -17,7 +17,7 @@ public class EventIndexTests
         var index = Build();
         var house = HouseModel.Load(HousePath);
         Assert.Equal(house.Rooms.Count, index.Rooms.Count);
-        Assert.Contains(index.Rooms, r => r.Id == "badN" && r.Name == "Badeværelse");
+        Assert.Contains(index.Rooms, r => r.Id == "kids_bathroom" && r.Name == "Badeværelse");
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public class EventIndexTests
     {
         var index = Build();
         Assert.Equal(Family.Create().Count, index.Persons.Count);
-        Assert.Contains(index.Persons, p => p.Id == "maxemil" && p.Kind == "Child" && p.HomeRoomId == "v2");
+        Assert.Contains(index.Persons, p => p.Id == "maxemil" && p.Kind == "Child" && p.HomeRoomId == "maxemils_bedroom");
         Assert.Contains(index.Persons, p => p.Id == "stephan" && p.Kind == "Adult");
     }
 
@@ -36,7 +36,7 @@ public class EventIndexTests
         var house = HouseModel.Load(HousePath);
         Assert.Equal(house.Appliances.Count, index.Points.Count);
 
-        var dishwasher = Assert.Single(index.Points, p => p.Id == "koekkenoe-opvask");
+        var dishwasher = Assert.Single(index.Points, p => p.Id == "dishwasher");
         Assert.Equal("dishwasher", dishwasher.Kind);
         Assert.NotNull(dishwasher.RoomId);
     }
