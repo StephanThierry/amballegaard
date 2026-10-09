@@ -507,6 +507,60 @@ function PianoStool({ p, rot = 0 }: { p: V3; rot?: number }) {
   )
 }
 
+/** Regnbuefarvet drikkedunk (seks striber + hvidt låg med hank). Lokalt: står oprejst, ingen fast retning. */
+function RainbowBottle({ p }: { p: V3 }) {
+  const f = fm()
+  const stripes = useMemo(() => ['#e94b3c', '#f2a93c', '#f4e04d', '#4caf50', '#3f8fd9', '#8e5fc9']
+    .map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.4 })), [])
+  const h = 0.026
+  return (
+    <At p={p}>
+      {stripes.map((m, i) => (
+        <mesh key={i} material={m} position={[0, 0.02 + h / 2 + i * h, 0]} castShadow>
+          <cylinderGeometry args={[0.028, 0.028, h, 16]} />
+        </mesh>
+      ))}
+      <mesh material={f.white} position={[0, 0.02 + h * stripes.length + 0.008, 0]} castShadow>
+        <cylinderGeometry args={[0.02, 0.026, 0.016, 16]} />
+      </mesh>
+      <mesh material={f.whiteMatte} position={[0.034, 0.02 + h * stripes.length - 0.02, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.022, 0.006, 8, 16, Math.PI]} />
+      </mesh>
+    </At>
+  )
+}
+
+/** Simpel hvid mini-stol (barnestørrelse). Lokalt: front (hvor man sidder og kigger hen) mod +z. */
+function MiniChair({ p, rot = 0 }: { p: V3; rot?: number }) {
+  const f = fm()
+  const legY = 0.14
+  return (
+    <At p={p} rot={rot}>
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+        <Box key={`${x}${z}`} p={[x * 0.12, legY / 2, z * 0.12]} s={[0.025, legY, 0.025]} m={f.white} />
+      ))}
+      <RoundedBox args={[0.28, 0.025, 0.28]} radius={0.01} smoothness={2} position={[0, legY + 0.0125, 0]} material={f.white} castShadow receiveShadow />
+      <RoundedBox args={[0.28, 0.24, 0.025]} radius={0.01} smoothness={2} position={[0, legY + 0.14, -0.1275]} material={f.white} castShadow receiveShadow />
+      {/* Regnbuefarvet drikkedunk, glemt på sædet */}
+      <RainbowBottle p={[0.07, legY + 0.025, 0.03]} />
+    </At>
+  )
+}
+
+/** Simpelt hvidt mini-bord i samme stil som MiniChair (samme benprofil, bare højere og bredere). */
+function MiniTable({ p, rot = 0 }: { p: V3; rot?: number }) {
+  const f = fm()
+  const legY = 0.26
+  return (
+    <At p={p} rot={rot}>
+      {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => (
+        <Box key={`${x}${z}`} p={[x * 0.19, legY / 2, z * 0.19]} s={[0.03, legY, 0.03]} m={f.white} />
+      ))}
+      <RoundedBox args={[0.46, 0.03, 0.46]} radius={0.015} smoothness={2} position={[0, legY + 0.015, 0]} material={f.white} castShadow receiveShadow />
+    </At>
+  )
+}
+
 function Stool({ p }: { p: V3 }) {
   const f = fm()
   return (
@@ -2903,6 +2957,8 @@ function renderItem(it: FurnitureItem): ReactNode {
     case 'officeChair': return <OfficeChair p={O} />
     case 'stool': return <Stool p={O} />
     case 'pianoStool': return <PianoStool p={O} />
+    case 'miniChair': return <MiniChair p={O} />
+    case 'miniTable': return <MiniTable p={O} />
     case 'toilet': return <Toilet id={it.id} />
     case 'vanity': return <Vanity p={O} w={it.w} bigMirror={it.bigMirror} />
     case 'showerNiche': return <ShowerNiche w={it.w} d={it.d} />

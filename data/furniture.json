@@ -71,6 +71,8 @@
     {"id": "kabel-keyboard-mikrofon", "name": "Ledning fra keyboardet til scenemikrofonen på bordet", "room": "v2", "kind": "cable", "pos": [0, 0], "width": 0.006, "points": [[22.3, 0.8, 6.95], [22.0, 0.15, 7.0], [21.8, 0.03, 7.05], [21.65, 0.3, 7.1], [21.6, 0.78, 7.13]]},
     {"id": "garderobe-maxemil", "name": "Max-Emils garderobeskab (flyttet til sydøst-hjørnet efter vektor V1, kan åbnes — drengetøj)", "room": "v2", "kind": "wardrobe", "pos": [22.8, 9.37], "rot": 180, "w": 1.1, "contents": "boy"},
     {"id": "basketball", "name": "Basketball (orange, kan trækkes rundt og hopper realistisk)", "room": "v2", "kind": "ball", "pos": [22.0, 8.3]},
+    {"id": "ministol-maxemil", "name": "Hvid mini-stol ved siden af sengen, med en regnbuefarvet drikkedunk på sædet (placeret efter vektor V1)", "room": "v2", "kind": "miniChair", "pos": [21.94, 8.61], "rot": -90},
+    {"id": "minibord-maxemil", "name": "Hvidt mini-bord midt i rummet (samme stil som mini-stolen, placeret efter vektor V2)", "room": "v2", "kind": "miniTable", "pos": [22.51, 8.16], "rot": -90},
     {"id": "toilet-badN", "name": "Væghængt toilet (bad, østvæggen)", "room": "badN", "kind": "toilet", "pos": [23.09, 0.51], "rot": -90},
     {"id": "haandvask-badN", "name": "Håndvask (bad)", "room": "badN", "kind": "vanity", "pos": [21.55, 1.66], "rot": 180, "w": 1},
     {"id": "bruser", "name": "Bruseniche", "room": "badN", "kind": "shower", "pos": [22.83, 1.4], "rot": 0},
