@@ -4,3 +4,12 @@ node_modules/
 src/Amballegaard.Server/wwwroot/
 *.user
 .vs/
+.vscode/
+.idea/
+TestResults/
+*.binlog
+
+# OS-cruft
+.DS_Store
+Thumbs.db
+Desktop.ini
