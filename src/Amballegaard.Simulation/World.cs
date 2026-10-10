@@ -150,17 +150,28 @@ public void Tick(double realDt)
             StepWander(agent, realDt);
     }
 
-    private void StepWander(Agent agent, double dt)
+private void StepWander(Agent agent, double dt)
     {
         if (agent.Target is not { } target)
         {
             agent.IdleSeconds -= dt * TimeScale;
             if (!agent.InEvent) agent.Activity = "idle";
             if (agent.IdleSeconds > 0) return;
-            if (agent.InLoveMeeting || agent.InEvent || agent.PendingResponseOptions is not null) { agent.IdleSeconds = 0.4; return; }
-            if (agent.WanderRoomId is not null) PlanIndoorWalk(agent);
-            else agent.Target = NextWanderTarget(agent);
-            if (agent.Target is null) agent.IdleSeconds = 1 + _rng.NextDouble() * 2;
+
+            // Hvis man taler, lytter, venter på svar eller er i event: bliv stående stille
+            if (agent.InLoveMeeting || agent.InEvent || agent.PendingResponseOptions is not null || agent.ConvoWaitRemaining > 0 || agent.Speech is not null)
+            {
+                agent.IdleSeconds = 0.5;
+                return;
+            }
+
+            if (agent.WanderRoomId is not null)
+                PlanIndoorWalk(agent);
+            else
+                PlanOutdoorWander(agent);
+
+            if (agent.Target is null)
+                agent.IdleSeconds = 5 + _rng.NextDouble() * 10;
             return;
         }
 
@@ -189,13 +200,18 @@ public void Tick(double realDt)
                 {
                     var app = agent.PendingAppliance;
                     ClearPath(agent);
-                    agent.IdleSeconds = 2 + _rng.NextDouble() * 6;
+
+                    // Længere ophold i rummet (20-60 sek), især i eget værelse/kontor (op til 90 sek)
+                    var isHome = agent.RoomId == agent.HomeRoomId;
+                    agent.IdleSeconds = isHome ? (35 + _rng.NextDouble() * 60) : (20 + _rng.NextDouble() * 40);
+
                     if (app is not null)
                     {
                         agent.HeldDoors.Add(app.Id);
                         agent.Heading = Math.PI;
-                        agent.IdleSeconds = 5;
-                        Say(agent, Speech.Appliance(app.Kind, _rng));
+                        agent.IdleSeconds = 8;
+                        // Dynamisk replik fra appliances.json med afsæt i apparatets kind og agentens rolle
+                        Say(agent, Speech.Appliance(app.Kind, agent, _rng));
                     }
                     break;
                 }
@@ -371,8 +387,9 @@ public void Tick(double realDt)
         return true;
     }
 
-    private void StepSpeech(Agent agent, double dt)
+private void StepSpeech(Agent agent, double dt)
     {
+        // 1. Modparten svarer: venter på at starterens replik er læst færdig
         if (agent.PendingResponseOptions is { } options)
         {
             agent.PendingResponseIn -= dt;
@@ -383,12 +400,21 @@ public void Tick(double realDt)
             }
             return;
         }
+
+        // 2. Starteren venter på svar: tæller ConvoWaitRemaining ned
+        if (agent.ConvoWaitRemaining > 0)
+        {
+            agent.ConvoWaitRemaining -= dt;
+        }
+
+        // 3. Aktiv taleboble tælles ned
         if (agent.Speech is not null)
         {
             agent.SpeechRemaining -= dt;
             if (agent.SpeechRemaining <= 0) agent.Speech = null;
             return;
         }
+
         agent.NextSpeechIn -= dt;
         if (agent.InLoveMeeting || agent.InEvent || agent.NextSpeechIn > 0 || _agents.Count(a => a.Speech is not null) >= 2) return;
 
@@ -397,21 +423,44 @@ public void Tick(double realDt)
         var others = _agents.Where(a => a.Id != agent.Id && a.Active && a.Kind != AgentKind.Dog
             && a.RoomId == agent.RoomId && a.Speech is null && a.PendingResponseOptions is null && !a.InLoveMeeting && !a.InEvent).ToList();
 
-        var pool = Speech.Lines.Where(l => l.Fits(agent)).ToList();
-        if (others.Count > 0) pool.AddRange(Speech.Conversations.Where(c => c.Fits(agent)));
+        // Spontane replikker evalueret mod agent, rum, aktuel tid (SimTime) og husmodellen
+        var pool = Speech.Lines.Where(l => l.Fits(agent, agent.RoomId, SimTime, House)).ToList();
+
+        // Samtaler tilføjes hvis der er en modpart i rummet
+        if (others.Count > 0)
+        {
+            pool.AddRange(Speech.Conversations.Where(c => c.Fits(agent, agent.RoomId, SimTime, House)));
+        }
+
         if (pool.Count == 0) return;
 
         var line = pool[_rng.Next(pool.Count)];
         Say(agent, line.Text);
+
         if (line.Responses is { } responses && others.Count > 0)
         {
+            // Tale-stop: Begge parter stopper op og vender ansigtet mod hinanden under samtalen
             var responder = others[_rng.Next(others.Count)];
+            
+            ClearPath(agent);
             ClearPath(responder);
+
+            var toResponder = responder.Position - agent.Position;
+            if (toResponder.Length > 0.01)
+            {
+                agent.Heading = Math.Atan2(toResponder.X, toResponder.Z);
+                responder.Heading = Math.Atan2(-toResponder.X, -toResponder.Z);
+            }
+
+            // Begge parter bliver stående stille under hele dialogen
+            agent.ConvoWaitRemaining = agent.SpeechRemaining + 4.5;
+            agent.IdleSeconds = agent.ConvoWaitRemaining + 2.0;
+
             responder.PendingResponseOptions = responses;
             responder.PendingResponseIn = agent.SpeechRemaining;
+            responder.IdleSeconds = agent.ConvoWaitRemaining + 2.0;
         }
-    }
-    
+    }    
 
     private void StepLove(double dt)
     {
@@ -613,5 +662,46 @@ public void Tick(double realDt)
         if (House.Site?.Bounds is not { Length: 2 } b) return p;
         const double m = 0.5;
         return new Vec2(Math.Clamp(p.X, b[0][0] + m, b[1][0] - m), Math.Clamp(p.Z, b[0][1] + m, b[1][1] - m));
+    }
+    
+    /// <summary>
+    /// Udendørs vandring i haven og på terrassen. Efter noget tid søger beboeren ind i huset igen.
+    /// </summary>
+    private void PlanOutdoorWander(Agent agent)
+    {
+        // 25% chance for at gå ind i huset igen
+        if (_rng.NextDouble() < 0.25)
+        {
+            var entrance = FindBestEntranceDoor(agent.Position);
+            if (entrance is not null)
+            {
+                var insideRoom = House.RoomAt(entrance.Position);
+                if (insideRoom is not null && !agent.ExcludedRooms.Contains(insideRoom.Id))
+                {
+                    agent.WanderRoomId = insideRoom.Id;
+                    agent.WanderAnchor = null;
+                    agent.Target = entrance.Position;
+                    agent.IdleSeconds = 10 + _rng.NextDouble() * 20;
+                    return;
+                }
+            }
+        }
+
+        // Ellers gå rundt i haven / på terrassen
+        agent.Target = NextWanderTarget(agent);
+        if (agent.Target is null)
+            agent.IdleSeconds = 8 + _rng.NextDouble() * 15;
+    }
+
+    private OpeningDef? FindBestExitDoor(Vec2 pos)
+    {
+        var exits = House.Openings.Where(o => o.Type is "glassDoor" or "exteriorDoor" or "frontDoor").ToList();
+        return exits.MinBy(o => Vec2.Distance(pos, o.Position));
+    }
+
+    private OpeningDef? FindBestEntranceDoor(Vec2 pos)
+    {
+        var entrances = House.Openings.Where(o => o.Type is "glassDoor" or "exteriorDoor" or "frontDoor").ToList();
+        return entrances.MinBy(o => Vec2.Distance(pos, o.Position));
     }
 }

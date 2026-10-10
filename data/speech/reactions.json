@@ -1,0 +1,16 @@
+﻿[
+  { "trigger": "pickedUp", "speaker": "Adult", "text": "Hov! Hvor flyver vi hen?!" },
+  { "trigger": "pickedUp", "speaker": "Adult", "text": "Sæt mig lige ned igen!" },
+  { "trigger": "pickedUp", "speaker": "Adult", "text": "Jeg har ikke engang sko på!" },
+  { "trigger": "pickedUp", "speaker": "Adult", "text": "Jeg kan altså godt gå selv!" },
+  { "trigger": "pickedUp", "speaker": "Child", "text": "Wiiiii! Højere!" },
+  { "trigger": "pickedUp", "speaker": "Child", "text": "Se mig, jeg er en superhelt!" },
+  { "trigger": "pickedUp", "speaker": "Child", "text": "Igen, igen!" },
+  { "trigger": "pickedUp", "speaker": "Dog", "text": "Vuf?!" },
+  { "trigger": "pickedUp", "speaker": "Dog", "text": "*piber forvirret*" },
+  { "trigger": "pickedUp", "speaker": "Dog", "text": "*spræller med poterne*" },
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Uhhh der kom min kysti - dejligt!" },
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Næææh, en kysti kom flyvende - lækkert!" },
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Det koster et kys at komme flyvende!" },
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "En kysti! Haps haps." }
+]

@@ -1,0 +1,62 @@
+﻿[
+  {
+    "pointKind": "fridge",
+    "speaker": "Anyone",
+    "text": "...noget at drikke...."
+  },
+  {
+    "pointKind": "fridge",
+    "speaker": "Adult",
+    "text": "Hvem har sat en tom mælkekarton tilbage på hylden?!"
+  },
+  {
+    "pointKind": "fridge",
+    "speaker": "Child",
+    "text": "Mon vi har kakao..."
+  },
+  {
+    "pointKind": "fridge",
+    "speaker": "Adult",
+    "text": "Vi skal huske at skrive smør og æg på indkøbssedlen."
+  },
+  {
+    "pointKind": "freezer",
+    "speaker": "Adult",
+    "text": "Vi skal vist ha' afrimet fryseren snart."
+  },
+  {
+    "pointKind": "freezer",
+    "speaker": "Child",
+    "text": "Er der mon flere isvafler gemt i skuffen?"
+  },
+  {
+    "pointKind": "dishwasher",
+    "speaker": "Adult",
+    "text": "Jeg tømmer lige opvaskeren"
+  },
+  {
+    "pointKind": "dishwasher",
+    "speaker": "Anyone",
+    "text": "Er det rent det der er i opvaskeren?"
+  },
+  {
+    "pointKind": "stove",
+    "speaker": "Adult",
+    "text": "Pas på, komfuret kan stadig være varmt."
+  },
+  {
+    "pointKind": "tv",
+    "speaker": "Anyone",
+    "text": "Skærmen trænger vidst til at blive tørret af"
+  },
+  {
+    "pointKind": "dryerDoor",
+    "speaker": "Adult",
+    "text": "Vi skal vist have renset filteret i tørretumbleren."
+  },
+  {
+    "pointKind": "washerDoor",
+    "speaker": "Adult",
+    "text": "Jeg sætter lige en vask over."
+  }
+]

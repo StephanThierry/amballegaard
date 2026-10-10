@@ -23,7 +23,10 @@ EventIndexWriter.Write(house, agents, eventIndexPath);
 // Opret verdenen og start indlæsning af dagsplan-filer med hot-reload
 var world = new World(house, agents);
 world.LoadEventsFromDirectory(eventsDir);
-
+var speechDir = builder.Configuration["SpeechDir"]
+    ?? Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "..", "data", "speech"));
+    
+Speech.LoadFromDirectory(speechDir, house);
 builder.Services.AddSingleton(house);
 builder.Services.AddSingleton(world);
 builder.Services.AddSingleton<SimulationGate>();

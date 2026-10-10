@@ -1,0 +1,110 @@
+﻿[
+  {
+    "text": "Hallo! Hvor er fjernbetjeningen?",
+    "speaker": "Anyone",
+    "requiresApplianceInRoom": "tv",
+    "timeRange": { "from": "16:00", "to": "21:30" }
+  },
+  {
+    "text": "Gad vide om der er kommet nye afsnit på Netflix?",
+    "speaker": "Anyone",
+    "requiresApplianceInRoom": "tv",
+    "timeRange": { "from": "18:00", "to": "21:30" }
+  },
+  {
+    "text": "Hvem har slæbt mudder med ind?",
+    "speaker": "Adult",
+    "rooms": [ "entrance_hall", "laundry_room" ]
+  },
+  {
+    "text": "Husk at lukke terrassedøren, så varmen ikke suser ud!",
+    "speaker": "Adult",
+    "rooms": [ "kitchen_family_room", "living_room" ]
+  },
+  {
+    "text": "Er der andre der skal ha en kop kaffe?",
+    "speaker": "Adult",
+    "rooms": [ "kitchen_family_room" ],
+    "timeRange": { "from": "07:00", "to": "16:00" }
+  },
+  {
+    "text": "Jeg trænger altså til en god kop te lige om lidt.",
+    "speaker": "lisa",
+    "timeRange": { "from": "14:00", "to": "21:30" }
+  },
+  {
+    "text": "Hækken og haven ser nu altså skøn ud i dag.",
+    "speaker": "Adult",
+    "timeRange": { "from": "09:00", "to": "18:00" },
+    "excludeRooms": [ "garage", "technical_room" ]
+  },
+  {
+    "text": "Jeg skal lige have fikset de sidste bugs før release.",
+    "speaker": "Adult",
+    "rooms": [ "stephans_office", "lisas_office" ]
+  },
+  {
+    "text": "Jeg burde sætte noget heavy metal på anlægget... Henret eller Upon a Burning Body!",
+    "speaker": "stephan",
+    "rooms": [ "living_room", "stephans_office" ]
+  },
+  {
+    "text": "Måske jeg skulle spille en omgang Demon's Souls i aften.",
+    "speaker": "stephan",
+    "timeRange": { "from": "18:00", "to": "22:00" }
+  },
+  {
+    "text": "Jeg burde arbejde på mit maleri",
+    "speaker": "lisa",
+    "rooms": [ "lisas_office" ]
+  },
+  {
+    "text": "Hvem har mon rykket rundt på puderne i sofaen igen?",
+    "speaker": "lisa",
+    "rooms": [ "living_room" ]
+  },
+  {
+    "text": "Aaaa'CHU - aaaa-chu, ACHU! Uha da.",
+    "speaker": "lisa"
+  },
+  {
+    "text": "Jeg vil være YouTuber og have en million følgere!",
+    "speaker": "mathilde",
+    "rooms": [ "mathildes_bedroom", "living_room" ]
+  },
+  {
+    "text": "Hør lige den sang, jeg har lavet på keyboardet!",
+    "speaker": "maxemil",
+    "rooms": [ "maxemils_bedroom" ]
+  },
+  {
+    "text": "Jeg keder mig... må jeg ikke godt få iPad'en?",
+    "speaker": "maxemil",
+    "timeRange": { "from": "09:00", "to": "19:00" }
+  },
+  {
+    "text": "Mit værelse skal laves helt om! Jeg har 1000 idéer.",
+    "speaker": "mathilde",
+    "rooms": [ "mathildes_bedroom" ]
+  },
+  {
+    "text": "Må jeg bestemme musikken, hvis vi sætter noget på?",
+    "speaker": "mathilde",
+    "rooms": [ "kitchen_family_room", "living_room" ]
+  },
+  {
+    "text": "Gad vide om robotklipperen er kørt fast i haven igen?",
+    "speaker": "Adult",
+    "timeRange": { "from": "10:00", "to": "18:00" }
+  },
+  {
+    "text": "Vi skal huske at købe mælk i morgen.",
+    "speaker": "Adult",
+    "timeRange": { "from": "17:00", "to": "21:00" }
+  },
+  {
+    "text": "Sikke en hyggelig brændeovn vi har.",
+    "speaker": "Adult",
+    "requiresApplianceInRoom": "fireplace"
+  }
+]

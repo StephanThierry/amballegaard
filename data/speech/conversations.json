@@ -1,0 +1,81 @@
+﻿[
+  {
+    "starter": "Skal vi se en god film i aften?",
+    "speaker": "Anyone",
+    "requiresApplianceInRoom": "tv",
+    "timeRange": { "from": "17:30", "to": "22:00" },
+    "responses": [
+      "Ja! Jeg laver popcorn.",
+      "Kun hvis det ikke er en gyser.",
+      "Lad os finde noget på Netflix.",
+      "Et enkelt afsnit kan jeg godt."
+    ]
+  },
+  {
+    "starter": "Skal vi spille PlayStation sammen?",
+    "speaker": "Anyone",
+    "requiresApplianceInRoom": "tv",
+    "responses": [
+      "Ja! Men du vinder altid i Mario Kart.",
+      "Giv mig to minutter, så er jeg klar!",
+      "Jeg skal lige gøre det her færdigt først."
+    ]
+  },
+  {
+    "starter": "Hvad skal vi have til aftensmad i dag?",
+    "speaker": "Adult",
+    "rooms": [ "kitchen_family_room", "living_room" ],
+    "timeRange": { "from": "15:00", "to": "19:00" },
+    "responses": [
+      "Kunne vi ikke bestille pizza for en gangs skyld?",
+      "Der er rester af lasagnen fra i går i køleskabet.",
+      "Jeg kan godt lave en hurtig omgang pasta.",
+      "Hvad med at grille på terrassen?"
+    ]
+  },
+  {
+    "starter": "Gider du hjælpe mig med at dække bordet?",
+    "speaker": "Adult",
+    "rooms": [ "kitchen_family_room" ],
+    "timeRange": { "from": "17:30", "to": "19:30" },
+    "responses": [
+      "Ja, jeg henter tallerkenerne!",
+      "Lige to sekunder, jeg skal bare have skoene af.",
+      "Hvor mange bliver vi?",
+      "Selvfølgelig, jeg tager glassene."
+    ]
+  },
+  {
+    "starter": "Skal vi gå en lille tur ud i haven og få frisk luft?",
+    "speaker": "Anyone",
+    "timeRange": { "from": "09:00", "to": "18:30" },
+    "responses": [
+      "Ja, det er skønt vejr i dag!",
+      "Skal vi tage bolden med?",
+      "Jeg henter lige en trøje først.",
+      "Kun en kort Ã©n, jeg er midt i noget."
+    ]
+  },
+  {
+    "starter": "Skal vi tænde op i pejsen?",
+    "speaker": "Anyone",
+    "requiresApplianceInRoom": "fireplace",
+    "timeRange": { "from": "16:00", "to": "23:00" },
+    "responses": [
+      "Ja, det lyder vildt hyggeligt!",
+      "God idÃ©, jeg fryser lidt om tæerne.",
+      "Kun hvis du henter mere brænde."
+    ]
+  },
+  {
+    "starter": "Har du husket at pakke skoletasken til i morgen?",
+    "speaker": "Adult",
+    "timeRange": { "from": "18:00", "to": "21:00" },
+    "responses": [
+      "Jaaaja, næsten...",
+      "Jeg mangler lige at finde mit penalhus.",
+      "Det gjorde jeg allerede i eftermiddags!",
+      "Gør det lige om fem minutter."
+    ]
+  }
+]
