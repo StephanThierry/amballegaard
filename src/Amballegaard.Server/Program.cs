@@ -47,6 +47,30 @@ app.MapGet("/api/agents", (World world) => world.Agents.Select(a => a.ToInfo()))
 // Standard-figurstil for nye besøgende (hver bruger kan vælge en anden i sin egen browser).
 app.MapGet("/api/config", (IConfiguration cfg) => new { defaultAvatarStyle = cfg["DefaultAvatarStyle"] ?? "voxel" });
 app.MapGet("/api/state", (World world) => world.Snapshot());
+// Debug-endpoint: Fyrer et event manuelt fra browseren
+app.MapGet("/api/test-trigger", (World world, string? person, string? id) =>
+{
+    var p = person ?? "stephan";
+    var nodeId = id ?? "TOBED_S1";
+    var node = world.EventEngine.CompletedToday; // adgang
+    // Find noden og start den direkte:
+    var allNodes = EventLoader.LoadDirectory(Path.GetDirectoryName(eventIndexPath)!);
+    var targetNode = allNodes.FirstOrDefault(n => n.Person == p && n.Id == nodeId);
+    if (targetNode is null) return Results.NotFound($"Node {p}:{nodeId} ikke fundet");
+    
+    world.EventEngine.StartNode(targetNode);
+    return Results.Ok($"Udløste {p}:{nodeId} ({targetNode.Action.Type})");
+});
+
+// Debug-status: Se indlæste noder og hvad beboerne laver lige nu
+app.MapGet("/api/events-debug", (World world) => new
+{
+    SimTime = world.SimTime.ToString(@"dd\.hh\:mm\:ss"),
+    TimeScale = world.TimeScale,
+    Paused = world.Paused,
+    CompletedEventsToday = world.EventEngine.CompletedToday.Select(k => $"{k.Person}:{k.Id}"),
+    Agents = world.Agents.Select(a => new { a.Name, a.RoomId, a.Activity, a.InEvent, a.CurrentEventChain, a.Speech })
+});
 
 app.MapHub<WorldHub>("/hubs/world");
 app.MapFallbackToFile("index.html");

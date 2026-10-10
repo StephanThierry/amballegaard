@@ -3,6 +3,12 @@ using System.Text.Json.Serialization;
 
 namespace Amballegaard.Simulation.Events;
 
+/// <summary>Understøttet schema-version for event-definitioner.</summary>
+public static class EventSchema
+{
+    public const int CurrentVersion = 1;
+}
+
 /// <summary>Mål for en goto-handling (rum, person eller interaktionspunkt).</summary>
 [JsonConverter(typeof(ActionTargetConverter))]
 public sealed record ActionTarget(string Kind, string Value);
@@ -37,12 +43,6 @@ public sealed class ActionTargetConverter : JsonConverter<ActionTarget>
         writer.WriteString("value", value.Value);
         writer.WriteEndObject();
     }
-}
-
-/// <summary>Understøttet schema-version for event-definitioner.</summary>
-public static class EventSchema
-{
-    public const int CurrentVersion = 1;
 }
 
 /// <summary>Læser både int og string som string fra JSON (så id: 16 og id: "16" begge accepteres).</summary>
@@ -100,7 +100,7 @@ public sealed record EventAction
 /// <summary>Én node i dagsplan-grafen jf. dagsplan-motor.md §3.</summary>
 public sealed record EventNode
 {
-    public required string Person { get; init; }
+    public string Person { get; init; } = ""; // redundant, så denne er ikke i JSON men populeres af koden
 
     [JsonConverter(typeof(FlexibleStringConverter))]
     public required string Id { get; init; }

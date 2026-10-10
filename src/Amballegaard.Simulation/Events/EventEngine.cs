@@ -50,6 +50,7 @@ public sealed class EventEngine
         var agent = _world.Agents.FirstOrDefault(a => a.Id == node.Person);
         if (agent is null || !agent.Active) return false;
 
+        // Fan-in: tjek om forudsætninger i waitFor er opfyldt
         if (node.WaitFor is { Count: > 0 } waits)
         {
             var allDone = waits.All(w => _completedNodesToday.Contains((w.Person, w.Id)));
@@ -62,6 +63,11 @@ public sealed class EventEngine
             _pendingWaitFor.Remove(node);
         }
 
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"[Event START] {agent.Name} starter '{node.Action.Type}' (Node: {node.Id}, Kæde: {node.Chain ?? "ingen"})");
+        Console.ResetColor();
+
+        // Øjeblikkelige handlinger (setState og interact) jf. dagsplan-motor.md §4
         if (node.Action.Type == "setState")
         {
             if (!string.IsNullOrWhiteSpace(node.Action.Activity))
@@ -85,6 +91,7 @@ public sealed class EventEngine
             return true;
         }
 
+        // Tidsbaserede handlinger (goto, speak, wait, chore)
         _world.ClearPath(agent);
         agent.InEvent = true;
         agent.CurrentEventChain = node.Chain;
@@ -260,12 +267,10 @@ public sealed class EventEngine
                 return agent.Target is null;
 
             case "speak":
-                // Talebobler holdes i realtid så de kan læses
                 exec.Timer -= dt;
                 return exec.Timer <= 0 || agent.Speech is null;
 
             case "wait":
-                // Wait skalerer med timeScale
                 exec.Timer -= dt * timeScale;
                 return exec.Timer <= 0;
 
@@ -299,6 +304,10 @@ public sealed class EventEngine
         var key = (exec.Node.Person, exec.Node.Id);
         _completedNodesToday.Add(key);
         _activeByPerson.Remove(exec.Agent.Id);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[Event FÆRDIG] {exec.Agent.Name} fuldførte '{exec.Node.Action.Type}' (Node: {exec.Node.Id})");
+        Console.ResetColor();
 
         TriggerOncomplete(exec.Node, exec.Agent);
     }
