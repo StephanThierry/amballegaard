@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Amballegaard.Simulation;
 using Amballegaard.Simulation.Agents;
 using Amballegaard.Simulation.House;
@@ -8,6 +9,11 @@ public class HouseModelTests
 {
     private static readonly string HousePath = Path.GetFullPath(
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "data", "house.json"));
+
+    private static readonly string SpeechDir = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "data", "speech"));
+
+    static HouseModelTests() => Speech.LoadFromDirectory(SpeechDir, house: null, enableHotReload: false);
 
     private static HouseModel Load() => HouseModel.Load(HousePath);
 
@@ -149,7 +155,7 @@ public class HouseModelTests
     [Fact]
     public void Residents_talk_with_lines_that_fit_them()
     {
-        Assert.Equal(69, Speech.Lines.Count);
+        Assert.Equal(21, Speech.Lines.Count);
         var world = new World(Load(), Family.Create(), seed: 9);
         var heard = new HashSet<(string, string)>();
         for (var i = 0; i < 6000; i++)
@@ -343,8 +349,13 @@ public class HouseModelTests
             opened = world.OpenDoors.Contains("fridge") || world.OpenDoors.Contains("freezer");
         }
         Assert.True(opened, "Ingen åbnede køleskab eller fryser");
-        Assert.Contains(world.Agents, a => a.Speech is not null &&
-            (Speech.FridgeLines.Contains(a.Speech) || Speech.FreezerLines.Contains(a.Speech)));
+        var fridgeFreezerLines = JsonSerializer.Deserialize<List<ApplianceLineDef>>(
+                File.ReadAllText(Path.Combine(SpeechDir, "appliances.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!
+            .Where(l => l.PointKind is "fridge" or "freezer")
+            .Select(l => l.Text)
+            .ToHashSet();
+        Assert.Contains(world.Agents, a => a.Speech is not null && fridgeFreezerLines.Contains(a.Speech));
         Assert.True(world.ToggleDoor("fridge"));
     }
 
