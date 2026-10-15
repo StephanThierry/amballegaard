@@ -12,7 +12,7 @@
     {
       "id": "WAKE_L2",
       "trigger": { "type": "passive" },
-      "action": { "type": "speak", "text": "Godmorgen Max-Emil! Tid til at stÃ¥ op." },
+      "action": { "type": "speak", "text": "Godmorgen Max-Emil! Tid til at stå op." },
       "chain": "wakeup",
       "oncomplete": [
         { "person": "maxemil", "id": "MAX_WAKE_1" },
@@ -86,7 +86,7 @@
     {
       "id": "OPVASK_5",
       "trigger": { "type": "passive" },
-      "action": { "type": "speak", "text": "SÃ¥ er opvaskemaskinen klaret!" },
+      "action": { "type": "speak", "text": "Så er opvaskemaskinen klaret!" },
       "chain": "opvask",
       "oncomplete": []
     },

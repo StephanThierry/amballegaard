@@ -1,0 +1,43 @@
+﻿[
+  {
+    "lines": [ { "speaker": "both", "text": "Kys" } ],
+    "endsWithKiss": true
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Haps haps" },
+      { "speaker": "lisa", "text": "Uha skønt" }
+    ],
+    "endsWithKiss": false
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Skal vi have en date-aften snart?" },
+      { "speaker": "lisa", "text": "Ja tak, bare os to!" }
+    ],
+    "endsWithKiss": false
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Du bliver smukkere for hver dag." },
+      { "speaker": "lisa", "text": "Charmør!" }
+    ],
+    "endsWithKiss": false
+  },
+  {
+    "lines": [
+      { "speaker": "lisa", "text": "Duftiii" },
+      { "speaker": "stephan", "text": "Bedufti" },
+      { "speaker": "lisa", "text": "Strudsekys!" },
+      { "speaker": "stephan", "text": "Uftii!" }
+    ],
+    "endsWithKiss": false
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Du skal lige ha et kys!" },
+      { "speaker": "lisa", "text": "Det kan jeg ikke tage imod - du får det lige tilbage" }
+    ],
+    "endsWithKiss": true
+  }
+]

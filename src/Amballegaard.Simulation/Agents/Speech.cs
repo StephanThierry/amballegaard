@@ -1,208 +1,204 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Amballegaard.Simulation.House;
+
 namespace Amballegaard.Simulation.Agents;
 
-/// <summary>Hvem en replik passer til: alle mennesker, kun voksne, kun børn eller én bestemt beboer.</summary>
-public enum SpeakerFilter { Anyone, Adult, Child, Specific }
+public sealed record SpeechTimeRange(string From, string To);
 
 /// <summary>
-/// En replik. De fleste er "spontane udbrud" (<see cref="Responses"/> er null) som siges uden videre.
-/// Har den <see cref="Responses"/>, er den i stedet en "samtale": kræver mindst én anden beboer i samme
-/// rum, som så stopper op og svarer med en tilfældig replik fra listen — se World.StepSpeech.
-/// <see cref="Rooms"/> (husets rum-id'er, fx "living_room"/"master_bedroom") begrænser hvor replikken kan siges; null
-/// betyder alle rum (inkl. udenfor).
+/// En replik med kontekstuelle filtre (jf. docs/speech-spec.md).
 /// </summary>
 public sealed record SpeechLine(
     string Text,
-    SpeakerFilter Filter = SpeakerFilter.Anyone,
-    string? AgentId = null,
+    string? Speaker = null,
+    string[]? Speakers = null,
     string[]? Rooms = null,
+    string[]? ExcludeRooms = null,
+    string? RequiresApplianceInRoom = null,
+    SpeechTimeRange? TimeRange = null,
+    string[]? NotWhile = null,
     IReadOnlyList<string>? Responses = null)
 {
-    public bool Fits(Agent a) => a.Kind != AgentKind.Dog && (Rooms is null || Rooms.Contains(a.RoomId)) && Filter switch
+    private static readonly JsonSerializerOptions JsonOpts = new()
     {
-        SpeakerFilter.Adult => a.Kind == AgentKind.Adult,
-        SpeakerFilter.Child => a.Kind == AgentKind.Child,
-        SpeakerFilter.Specific => a.Id == AgentId,
-        _ => true,
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
     };
+
+    public static SpeechLine FromJson(string json) =>
+        JsonSerializer.Deserialize<SpeechLine>(json, JsonOpts) ?? throw new JsonException("Ugyldig SpeechLine JSON");
+
+    public bool Fits(Agent a) => Fits(a, a.RoomId, null, null);
+
+    public bool Fits(Agent a, string? roomId, TimeSpan? simTime, HouseModel? house)
+    {
+        if (a.Kind == AgentKind.Dog) return false;
+
+        var currentRoom = roomId ?? a.RoomId;
+
+        // 1. Aktivitetstjek (fx ikke snakke i søvne medmindre tilladt)
+        if (NotWhile is not null && NotWhile.Contains(a.Activity, StringComparer.OrdinalIgnoreCase))
+            return false;
+        if (string.Equals(a.Activity, "sleeping", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // 2. Speaker-filter
+        if (!MatchesSpeaker(a, Speaker, Speakers))
+            return false;
+
+        // 3. Rum-filter (hvidliste)
+        if (Rooms is not null && Rooms.Length > 0 && !Rooms.Contains(currentRoom, StringComparer.OrdinalIgnoreCase))
+            return false;
+
+        // 4. Negativt rum-filter (sortliste - fx ikke garagen for "her dufter godt")
+        if (ExcludeRooms is not null && ExcludeRooms.Contains(currentRoom, StringComparer.OrdinalIgnoreCase))
+            return false;
+
+        // 5. Krævet apparat i rummet (fx tv for fjernbetjening)
+        if (!string.IsNullOrEmpty(RequiresApplianceInRoom) && house is not null)
+        {
+            var hasApp = house.Appliances.Any(app =>
+                string.Equals(app.Kind, RequiresApplianceInRoom, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(house.RoomAt(app.Stand)?.Id, currentRoom, StringComparison.OrdinalIgnoreCase));
+
+            if (!hasApp && string.Equals(RequiresApplianceInRoom, "fireplace", StringComparison.OrdinalIgnoreCase))
+            {
+                hasApp = house.Openings.Any(o =>
+                    string.Equals(o.Type, "fireplace", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(house.RoomAt(o.Position)?.Id, currentRoom, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!hasApp) return false;
+        }
+
+        // 6. Tidsinterval (klokkeslæt på dagen)
+        if (TimeRange is not null && simTime.HasValue)
+        {
+            var tod = simTime.Value - TimeSpan.FromDays(Math.Floor(simTime.Value.TotalDays));
+            if (TimeSpan.TryParse(TimeRange.From, CultureInfo.InvariantCulture, out var from) &&
+                TimeSpan.TryParse(TimeRange.To, CultureInfo.InvariantCulture, out var to))
+            {
+                if (from <= to)
+                {
+                    if (tod < from || tod > to) return false;
+                }
+                else
+                {
+                    if (tod < from && tod > to) return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool MatchesSpeaker(Agent a, string? speaker, string[]? speakers)
+    {
+        if (speakers is not null && speakers.Length > 0)
+        {
+            return speakers.Any(s => MatchSingle(a, s));
+        }
+
+        if (string.IsNullOrWhiteSpace(speaker)) return true;
+        return MatchSingle(a, speaker);
+
+        static bool MatchSingle(Agent agent, string s)
+        {
+            if (s.Equals("Anyone", StringComparison.OrdinalIgnoreCase)) return true;
+            if (s.Equals("Adult", StringComparison.OrdinalIgnoreCase)) return agent.Kind == AgentKind.Adult;
+            if (s.Equals("Child", StringComparison.OrdinalIgnoreCase)) return agent.Kind == AgentKind.Child;
+            if (s.Equals("Dog", StringComparison.OrdinalIgnoreCase)) return agent.Kind == AgentKind.Dog;
+            return string.Equals(agent.Id, s, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 }
 
+public sealed record ApplianceLineDef(
+    string PointKind,
+    string Text,
+    string? Speaker = null,
+    string[]? Speakers = null,
+    string[]? Rooms = null)
+{
+    public bool Fits(Agent? a)
+    {
+        if (a is null) return true;
+        if (Speakers is not null && Speakers.Length > 0)
+        {
+            return Speakers.Any(s => MatchSpeaker(a, s));
+        }
+        if (string.IsNullOrWhiteSpace(Speaker)) return true;
+        return MatchSpeaker(a, Speaker);
+
+        static bool MatchSpeaker(Agent agent, string s)
+        {
+            if (s.Equals("Anyone", StringComparison.OrdinalIgnoreCase)) return true;
+            if (s.Equals("Adult", StringComparison.OrdinalIgnoreCase)) return agent.Kind == AgentKind.Adult;
+            if (s.Equals("Child", StringComparison.OrdinalIgnoreCase)) return agent.Kind == AgentKind.Child;
+            return string.Equals(agent.Id, s, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}
+
+public sealed record ReactionLineDef(
+    string Trigger, // "pickedUp" | "arrivalKiss"
+    string Text,
+    string? Speaker = null);
+
+public sealed record LoveLine(string Speaker, string Text);
+public sealed record LoveScript(IReadOnlyList<LoveLine> Lines, bool EndsWithKiss);
+
+/// <summary>
+/// Data-drevet motor for beboernes replikker og dialoger.
+/// Scanner data/speech/*.json og understøtter live hot-reload.
+/// </summary>
 public static class Speech
 {
-    private static SpeechLine Adult(string t) => new(t, SpeakerFilter.Adult);
-    private static SpeechLine Child(string t) => new(t, SpeakerFilter.Child);
-    private static SpeechLine Only(string id, string t) => new(t, SpeakerFilter.Specific, id);
-    private static SpeechLine InRooms(string t, params string[] rooms) => new(t, Rooms: rooms);
-    private static SpeechLine Convo(string t, IReadOnlyList<string> responses, SpeakerFilter filter = SpeakerFilter.Anyone, string[]? rooms = null, string? agentId = null)
-        => new(t, filter, agentId, rooms, responses);
+    private static readonly object Lock = new();
+    private static FileSystemWatcher? _watcher;
+    private static HouseModel? _house;
 
-    /// <summary>De tilfældige spontane replikker beboerne siger i hverdagen.</summary>
-    public static readonly IReadOnlyList<SpeechLine> Lines =
-    [
-        new("Hvad skal vi have til aftensmad?"),
-        new("Har nogen set fjernbetjeningen?"),
-        new("Sikke et dejligt vejr i dag!"),
-        new("Hvem har ladet lyset være tændt?"),
-        new("Jeg tror, det bliver regn senere."),
-        new("Skal vi ikke gå en tur ud i haven?"),
-        new("Er der nogen, der vil have en kop te?"),
-        new("Hvor er mine nøgler nu henne?"),
-        new("Husk at lukke terrassedøren!"),
-        new("Den brændeovn er bare så hyggelig."),
-        new("Jeg er SÅ mæt."),
-        InRooms("Hvem har slæbt mudder ind i entréen?", "laundry_room", "entrance_hall"),
-        InRooms("Gad vide om der er nogen gode serier jeg skal se…", "living_room"),
-        InRooms("Jeg skal tidligt i seng i dag.", "master_bedroom"),
-        new("Uhm, det dufter godt herinde!"),
-        new("Vi skal huske at købe mælk."),
-        new("Det er rart at være hjemme."),
-        Adult("Har du husket madpakken?"),
-        Adult("Nu er det altså sengetid!"),
-        Adult("Jeg har et møde om fem minutter."),
-        Adult("Hvem har lånt min oplader?"),
-        Adult("Skal vi tænde grillen i aften?"),
-        Adult("Hækken trænger altså til at blive klippet."),
-        Adult("Jeg tømmer lige opvaskeren."),
-        Adult("Wi-fi'en driller igen…"),
-        Adult("Hvorfor ligger der sokker midt på gulvet?"),
-        Adult("Har nogen fodret hunden?"),
-        Adult("Jeg sætter lige en vask over."),
-        Adult("Er der mere kaffe på kanden?"),
-        Child("Må jeg få noget slik?"),
-        Child("Jeg keder mig!"),
-        Child("Må jeg spille på iPad'en?"),
-        Child("Hvornår er det weekend?"),
-        Child("Det var IKKE mig!"),
-        Child("Må vi få pizza i aften?"),
-        Child("Jeg har lavet mine lektier… næsten."),
-        Child("Kan vi ikke få en trampolin?"),
-        Child("Mor! Far! Kom og se!"),
-        Child("Fem minutter mere…"),
-        Child("Hvorfor er himlen blå?"),
-        Child("Jeg er sulten!"),
-        Child("Hunden spiste min madpakke!"),
-        Child("Må min ven komme over?"),
-        Only("stephan", "Jeg skal lige fikse en bug."),
-        Only("stephan", "Har nogen set mine høretelefoner?"),
-        Only("stephan", "Jeg burde sætte noget HEAVY på... Henret eller Upon a Burning Body."),
-        Only("stephan", "Måske jeg skulle spille Demon's Souls i aften."),
-        Only("stephan", "Måske jeg skulle spille Ghost of Yōtei i aften."),
-        Only("stephan", "Måske jeg skulle spille Returnal i aften."),
-        Only("stephan", "Måske jeg skulle spille Horizon Forbidden West i aften."),
-        Only("stephan", "Måske jeg skulle spille Bloodborne i aften."),
-        Only("stephan", "Lige et sæt bænkpres mere, så er jeg klar."),
-        Only("stephan", "Jeg burde få nogle af mine 3D-print lavet."),
-        Only("lisa", "Hvem har flyttet rundt på puderne i sofaen?"),
-        Only("lisa", "Jeg sidder på mit kontor, hvis nogen leder."),
-        Only("lisa", "Jeg burde færdiggøre mit maleri."),
-        Only("lisa", "Jeg glæder mig til at spille videre på Horizon i aften."),
-        Only("lisa", "Hvem har rykket ved min ekstra skærm?"),
-        Only("lisa", "Jeg burde gå i gang med at træne."),
-        Only("lisa", "Pyha, blev der pludselig varmt herinde?!"),
-        Only("lisa", "Aaaa'CHU — aaaa-chu, ACHU!"),
-        Only("maxemil", "Jeg vil være YouTuber, når jeg bliver stor!"),
-        Only("maxemil", "Jeg har lavet en helt ny sang på keyboardet!"),
-        Only("maxemil", "Det er min Bella."),
-        Only("maxemil", "Waue — en poppit!"),
-        Only("mathilde", "Må jeg bestemme musikken?"),
-        Only("mathilde", "Hvem har været inde på mit værelse?!"),
-        Only("mathilde", "Gad godt spille Minecraft igen!"),
-        Only("mathilde", "Mit værelse skal laves om — jeg har 1000 idéer!"),
-    ];
+    private static List<SpeechLine> _ambientLines = [];
+    private static List<SpeechLine> _conversations = [];
+    private static List<ApplianceLineDef> _applianceLines = [];
+    private static List<ReactionLineDef> _reactionLines = [];
+    private static List<LoveScript> _loveScripts = [];
+    private static List<string> _dogLines = ["Vuf!", "Vuf vuf!", "*snøfter*", "Legetid?", "*logrer med halen*", "Grrr…"];
 
-    /// <summary>
-    /// "Samtaler": kræver mindst én anden beboer i samme rum. Starteren siges som en almindelig replik;
-    /// den tilstedeværende modpart stopper op og svarer (tilfældigt valgt fra Responses), når starterens
-    /// replik er færdig — se World.StepSpeech.
-    /// </summary>
-    public static readonly IReadOnlyList<SpeechLine> Conversations =
-    [
-        Convo("Skal vi spille brætspil i aften?",
-            ["Ja, det lyder hyggeligt!", "Kun hvis jeg må vælge spillet.", "Nu igen? Jeg tabte sidst…", "Først skal ungerne i seng."],
-            SpeakerFilter.Adult),
-        Convo("Skal vi se en film i aften?",
-            ["Ja! Jeg vælger popcorn.", "Kun hvis det ikke er gyser.", "Jeg faldt i søvn sidste gang, men ja.", "Lad os se noget på Streamberry."]),
-        Convo("Skal vi spille PlayStation sammen?",
-            ["Jeg er midt i Demon's Souls, men okay.", "Ja! Jeg har lige fået et nyt våben i Horizon.", "Kun hvis du lader mig vinde.", "Bare ikke for længe."],
-            rooms: ["living_room"]),
-        Convo("Vil du spille fodbold med mig i haven?",
-            ["Ja, giv mig to minutter!", "Kun hvis jeg må være målmand.", "Jeg er lidt træt, men okay.", "Spørg lige din søster også!"],
-            SpeakerFilter.Child),
-        Convo("Skal vi tænde op i brændeovnen?",
-            ["Ja, perfekt vejr til det.", "God idé, jeg fryser.", "Kun hvis du henter brænde — LOL, det er gas."],
-            rooms: ["living_room"]),
-        Convo("Skal vi grille i aften?",
-            ["Ja! Hvad skal vi smide på.", "Kun hvis vejret holder.", "God idé, jeg er træt af at lave mad indenfor.", "Vi mangler gas til grillen, tror jeg."]),
-        Convo("Skal vi ud og nyde terrassen lidt?",
-            ["Ja, det er skønt vejr!", "Lige om lidt.", "Kun hvis vi tager kaffe med.", "Er det ikke lidt koldt?"]),
-        Convo("Vil du se mit nye maleri?",
-            ["Ja, det vil jeg meget gerne!", "Wow, det tager sig flot ud!", "Er det snart færdigt?", "Jeg kommer om lidt."],
-            SpeakerFilter.Specific, agentId: "lisa", rooms: ["lisas_office"]),
-        Convo("Skal jeg sætte noget god musik på anlægget?",
-            ["Ja tak, noget roligt.", "Endelig, det anlæg skal da bruges!", "Bare ikke for højt.", "Ja! Sæt noget op-tempo på."],
-            SpeakerFilter.Specific, agentId: "stephan", rooms: ["living_room"]),
-        Convo("Skal vi bestille pizza i aften?",
-            ["JA ENDELIG!", "Igen? Men okay…", "Kun hvis børnene vælger topping.", "God idé, jeg gider ikke lave mad."]),
-        Convo("Skal vi tage en gåtur?",
-            ["Ja, frisk luft lyder dejligt!", "Kun en kort en, det er sent.", "Ja, jeg skal alligevel over til de gamle?", "Lige om lidt.", "Ja, så kan vi hente den pakke i SuperBrugsen."]),
-        Convo("Kan du hjælpe mig med at dække bord?",
-            ["Ja, kommer nu!", "To minutter, jeg er snart færdig.", "Kan ikke en anden gøre det for en gangs skyld?", "Selvfølgelig!"],
-            rooms: ["kitchen_family_room"]),
-        Convo("Skal vi bage sammen i weekenden?",
-            ["Ja! Jeg vil gerne lave boller.", "Kun hvis jeg må slikke skålen.", "God idé, lad os finde en opskrift.", "Jeg er ikke god til at bage, men okay!"]),
-    ];
-
-    public static readonly IReadOnlyList<string> DogLines = ["Vuf!", "Vuf vuf!", "*snøfter*", "Legetid?", "*logrer med halen*", "Grrr…"];
-
-    /// <summary>Reaktioner når brugeren løfter en beboer op med musen.</summary>
-    public static readonly IReadOnlyList<string> PickedUpLines =
-    [
-        "Hov! Sæt mig ned!", "Wiii!", "Hvor skal vi hen?!", "Jeg kan altså godt selv gå!", "Uha, det kilder!",
-        "HVAD sker der?!", "Jeg FLYVER!", "Hjæææælp!", "Det her stod ikke i kalenderen!", "Hvem løfter mig?!",
-        "Er det et jordskælv?!", "Jeg har ikke engang sko på!", "Mine fødder rører ikke jorden!", "Woooah!",
-        "Det her er SÅ mærkeligt!", "Åh nej, jeg får højdeskræk!", "Ej, hvad laver du?!", "Stop, jeg bliver svimmel!",
-        "Er jeg i en computer?!", "Nogen må forklare det her!", "Det havde jeg ikke set komme!", "Ahhh! Pas på lampen!",
-        "Jeg svæver! Jeg SVÆVER!", "Er det her normalt?!", "Hold da op!", "Det her skal jeg fortælle nogen om!",
-        "Kan vi ikke bare tage trapperne?", "Jeg er ikke en dukke!", "Okay… det her er faktisk lidt sjovt!",
-    ];
-    public static readonly IReadOnlyList<string> ChildPickedUpLines =
-    [
-        "Igen! Igen!", "Det er ligesom i Roblox!", "Jeg kan flyve som en superhelt!", "Mor! Far! Se mig!", "Wiiiii, højere!",
-    ];
-    public static readonly IReadOnlyList<string> DogPickedUpLines = ["Vuf?!", "*piber*", "*logrer forvirret*", "VUF VUF!", "*spræller med potterne*", "Auuuu!"];
-
-    public static readonly IReadOnlyList<string> FridgeLines =
-    [
-        "Hvem har drukket den sidste mælk?!", "Uhm… rester fra i går!", "Vi mangler altså smør.", "Er den ost stadig god?",
-        "Hvor er yoghurten?", "Jeg tager lige en gulerod.", "Hvem har sat en tom juicekarton tilbage?", "Der er intet at spise!",
-    ];
-    public static readonly IReadOnlyList<string> FreezerLines =
-    [
-        "Er der mere is?", "Pizza i aften? Der ligger en her!", "Brrr, koldt!", "Hvem har spist alle isvaflerne?",
-        "Vi skal huske at afrime fryseren.", "Fiskefrikadeller… igen?",
-    ];
-
-    public static string Appliance(string kind, Random rng)
+    public static IReadOnlyList<SpeechLine> Lines
     {
-        var pool = kind == "freezer" ? FreezerLines : FridgeLines;
-        return pool[rng.Next(pool.Count)];
+        get { lock (Lock) return _ambientLines; }
     }
 
-    public static string PickedUp(Agent a, Random rng)
+    public static IReadOnlyList<SpeechLine> Conversations
     {
-        var pool = a.Kind == AgentKind.Dog ? DogPickedUpLines
-            : a.Kind == AgentKind.Child ? PickedUpLines.Concat(ChildPickedUpLines).ToList()
-            : PickedUpLines;
-        // Sig ikke det samme to gange i træk.
-        string line;
-        do line = pool[rng.Next(pool.Count)]; while (pool.Count > 1 && line == a.Speech);
-        return line;
+        get { lock (Lock) return _conversations; }
     }
 
-    public static LoveScript RandomLoveScript(Random rng) => LoveScripts.All[rng.Next(LoveScripts.All.Count)];
+    public static IReadOnlyList<string> DogLines
+    {
+        get { lock (Lock) return _dogLines; }
+    }
 
-    /// <summary>Den der allerede står i rummet siger en af disse, når Stephan eller Lisa bliver trukket
-    /// hen til den anden (se World.MoveAgent). Alle ender med et kys.</summary>
-    public static readonly IReadOnlyList<string> ArrivalKissLines =
+    public static IReadOnlyList<string> ArrivalKissLines
+    {
+        get
+        {
+            lock (Lock)
+            {
+                var list = _reactionLines
+                    .Where(r => r.Trigger.Equals("arrivalKiss", StringComparison.OrdinalIgnoreCase))
+                    .Select(r => r.Text)
+                    .ToList();
+                return list.Count > 0 ? list : DefaultArrivalKiss;
+            }
+        }
+    }
+
+    private static readonly List<string> DefaultArrivalKiss =
     [
         "Uhhh der kom min kysti - dejligt",
         "Så fik man lige en kysti, skønt",
@@ -210,32 +206,186 @@ public static class Speech
         "En kysti! Haps haps",
         "Godag bedufti!",
         "Der kom lige en bedufti som ska ha et kys!",
-        "Det koster et kys at komme flyvende",
+        "Det koster et kys at komme flyvende"
     ];
-}
 
-/// <summary>En replik i et kærligheds-øjeblik. Speaker er "stephan", "lisa" eller "both" (begge siger den samtidig).</summary>
-public sealed record LoveLine(string Speaker, string Text);
+    public static void LoadFromDirectory(string speechDir, HouseModel? house = null, bool enableHotReload = true)
+    {
+        _house = house;
+        Reload(speechDir);
 
-/// <summary>Et lille skuespil Stephan og Lisa opfører, når de står helt tæt sammen. <c>EndsWithKiss</c> afgør om
-/// kysse-emojien vises i stedet for hjertet på den sidste replik.</summary>
-public sealed record LoveScript(IReadOnlyList<LoveLine> Lines, bool EndsWithKiss);
+        if (enableHotReload && Directory.Exists(speechDir))
+        {
+            _watcher?.Dispose();
+            _watcher = new FileSystemWatcher(speechDir, "*.json")
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
 
-public static class LoveScripts
-{
-    private static LoveLine S(string t) => new("stephan", t);
-    private static LoveLine L(string t) => new("lisa", t);
-    private static LoveLine Both(string t) => new("both", t);
+            var timer = new System.Timers.Timer(150) { AutoReset = false };
+            timer.Elapsed += (_, _) => Reload(speechDir);
 
-    public static readonly IReadOnlyList<LoveScript> All =
-    [
-        new([Both("Kys")], EndsWithKiss: true),
-        new([S("Haps haps"), L("Uha skønt")], EndsWithKiss: false),
-        new([S("Skal vi have en date-aften snart?"), L("Ja tak, bare os to!")], EndsWithKiss: false),
-        new([S("Hvad ville jeg gøre uden dig?"), L("Nok rode rundt og lede efter dine nøgler for evigt.")], EndsWithKiss: false),
-        new([S("Du bliver smukkere for hver dag."), L("Charmør!")], EndsWithKiss: false),
-        new([S("Må jeg stjæle et kys?"), L("Kun hvis det bliver mere end ét.")], EndsWithKiss: true),
-        new([L("Duftiii"), S("Bedufti"), L("Strudsekys!"), S("Uftii!")], EndsWithKiss: false),
-        new([S("Du skal lige ha et kys!"), L("Det kan jeg ikke tage imod - du får det lige tilbage")], EndsWithKiss: true),
-    ];
+            FileSystemEventHandler onChange = (_, _) =>
+            {
+                timer.Stop();
+                timer.Start();
+            };
+
+            _watcher.Changed += onChange;
+            _watcher.Created += onChange;
+            _watcher.Deleted += onChange;
+            _watcher.Renamed += (_, _) => onChange(null!, null!);
+        }
+    }
+
+    public static void Reload(string speechDir)
+    {
+        lock (Lock)
+        {
+            if (!Directory.Exists(speechDir)) return;
+
+            var jsonOpts = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+
+            var ambientPath = Path.Combine(speechDir, "ambient.json");
+            if (File.Exists(ambientPath))
+            {
+                try
+                {
+                    _ambientLines = JsonSerializer.Deserialize<List<SpeechLine>>(File.ReadAllText(ambientPath), jsonOpts) ?? [];
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[Speech] Fejl i ambient.json: {ex.Message}"); }
+            }
+
+            var convoPath = Path.Combine(speechDir, "conversations.json");
+            if (File.Exists(convoPath))
+            {
+                try
+                {
+                    var raw = JsonSerializer.Deserialize<List<JsonElement>>(File.ReadAllText(convoPath), jsonOpts) ?? [];
+                    var parsed = new List<SpeechLine>();
+                    foreach (var el in raw)
+                    {
+                        var text = el.TryGetProperty("starter", out var st) ? st.GetString() ?? "" : el.GetProperty("text").GetString() ?? "";
+                        var speaker = el.TryGetProperty("speaker", out var sp) ? sp.GetString() : null;
+                        var reqApp = el.TryGetProperty("requiresApplianceInRoom", out var ra) ? ra.GetString() : null;
+                        string[]? rooms = el.TryGetProperty("rooms", out var rm) ? JsonSerializer.Deserialize<string[]>(rm.GetRawText(), jsonOpts) : null;
+                        string[]? exRooms = el.TryGetProperty("excludeRooms", out var er) ? JsonSerializer.Deserialize<string[]>(er.GetRawText(), jsonOpts) : null;
+                        SpeechTimeRange? tr = el.TryGetProperty("timeRange", out var trEl) ? JsonSerializer.Deserialize<SpeechTimeRange>(trEl.GetRawText(), jsonOpts) : null;
+                        List<string>? responses = el.TryGetProperty("responses", out var resp) ? JsonSerializer.Deserialize<List<string>>(resp.GetRawText(), jsonOpts) : null;
+
+                        parsed.Add(new SpeechLine(text, speaker, null, rooms, exRooms, reqApp, tr, null, responses));
+                    }
+                    _conversations = parsed;
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[Speech] Fejl i conversations.json: {ex.Message}"); }
+            }
+
+            var appPath = Path.Combine(speechDir, "appliances.json");
+            if (File.Exists(appPath))
+            {
+                try
+                {
+                    _applianceLines = JsonSerializer.Deserialize<List<ApplianceLineDef>>(File.ReadAllText(appPath), jsonOpts) ?? [];
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[Speech] Fejl i appliances.json: {ex.Message}"); }
+            }
+
+            var reactPath = Path.Combine(speechDir, "reactions.json");
+            if (File.Exists(reactPath))
+            {
+                try
+                {
+                    _reactionLines = JsonSerializer.Deserialize<List<ReactionLineDef>>(File.ReadAllText(reactPath), jsonOpts) ?? [];
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[Speech] Fejl i reactions.json: {ex.Message}"); }
+            }
+
+            var lovePath = Path.Combine(speechDir, "love.json");
+            if (File.Exists(lovePath))
+            {
+                try
+                {
+                    _loveScripts = JsonSerializer.Deserialize<List<LoveScript>>(File.ReadAllText(lovePath), jsonOpts) ?? [];
+                }
+                catch (Exception ex) { Console.Error.WriteLine($"[Speech] Fejl i love.json: {ex.Message}"); }
+            }
+        }
+    }
+
+    public static string Appliance(string kind, Random rng) => Appliance(kind, null, rng);
+
+    public static string Appliance(string kind, Agent? agent, Random rng)
+    {
+        lock (Lock)
+        {
+            var matching = _applianceLines
+                .Where(l => string.Equals(l.PointKind, kind, StringComparison.OrdinalIgnoreCase) && l.Fits(agent))
+                .ToList();
+
+            if (matching.Count == 0)
+            {
+                matching = _applianceLines
+                    .Where(l => string.Equals(l.PointKind, kind, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            if (matching.Count > 0)
+            {
+                return matching[rng.Next(matching.Count)].Text;
+            }
+
+            return kind switch
+            {
+                "fridge" => "Hvad mon der er at spise herinde?",
+                "freezer" => "Brrr, der er koldt i fryseren!",
+                "dishwasher" => "Jeg ordner lige opvaskeren.",
+                _ => "Lad mig lige se..."
+            };
+        }
+    }
+
+    public static string PickedUp(Agent a, Random rng)
+    {
+        lock (Lock)
+        {
+            var pool = _reactionLines
+                .Where(r => r.Trigger.Equals("pickedUp", StringComparison.OrdinalIgnoreCase))
+                .Where(r => r.Speaker switch
+                {
+                    "Dog" => a.Kind == AgentKind.Dog,
+                    "Child" => a.Kind == AgentKind.Child,
+                    "Adult" => a.Kind == AgentKind.Adult,
+                    _ => a.Kind != AgentKind.Dog
+                })
+                .Select(r => r.Text)
+                .ToList();
+
+            if (pool.Count == 0)
+            {
+                return a.Kind == AgentKind.Dog ? "Vuf?!" : "Hov! Hvor skal vi hen?!";
+            }
+
+            string line;
+            do { line = pool[rng.Next(pool.Count)]; }
+            while (pool.Count > 1 && line == a.Speech);
+            return line;
+        }
+    }
+
+    public static LoveScript RandomLoveScript(Random rng)
+    {
+        lock (Lock)
+        {
+            if (_loveScripts.Count > 0)
+                return _loveScripts[rng.Next(_loveScripts.Count)];
+
+            return new LoveScript([new LoveLine("both", "Kys")], EndsWithKiss: true);
+        }
+    }
 }

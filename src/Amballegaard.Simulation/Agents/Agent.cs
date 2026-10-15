@@ -20,17 +20,14 @@ public sealed record Appearance(
 
 public sealed class Agent
 {
-    /// <summary>Sat mens beboeren udfører en handling i en dagsplan-kæde (se EventEngine).</summary>
-    public bool InEvent { get; set; }
-
-    /// <summary>Kosmetisk id på den igangværende dagsplan-kæde (fx "tobed", "wakeup") til log/UI.</summary>
-    public string? CurrentEventChain { get; set; }
-    
     public required string Id { get; init; }
     public required string Name { get; init; }
     public required AgentKind Kind { get; init; }
     public required Appearance Appearance { get; init; }
     public required string HomeRoomId { get; init; }
+
+    /// <summary>Rum som beboeren ikke må bevæge sig ind i (fx forældresoveværelse for børn).</summary>
+    public HashSet<string> ExcludedRooms { get; init; } = [];
 
     public Vec2 Position { get; set; }
     public double Heading { get; set; }
@@ -50,6 +47,12 @@ public sealed class Agent
     public string? WanderRoomId { get; set; }
     public Vec2? WanderAnchor { get; set; }
 
+    /// <summary>Sat mens beboeren udfører en handling i en dagsplan-kæde (se EventEngine).</summary>
+    public bool InEvent { get; set; }
+
+    /// <summary>Kosmetisk id på den igangværende dagsplan-kæde (fx "tobed", "wakeup") til log/UI.</summary>
+    public string? CurrentEventChain { get; set; }
+
     internal Vec2? Target { get; set; }
 
     /// <summary>Indendørs rute (waypoints) og de døre den går igennem.</summary>
@@ -64,13 +67,13 @@ public sealed class Agent
     internal double SpeechRemaining { get; set; }
     internal double NextSpeechIn { get; set; }
 
-    /// <summary>På vej til, eller står i, et "kærligheds-øjeblik" med en anden beboer (se <c>World.StepLove</c>).
-    /// Mens dette er sat, overtager ikke den normale vandre-AI beboerens næste mål.</summary>
+    /// <summary>På vej til, eller står i, et "kærligheds-øjeblik" med en anden beboer (se <c>World.StepLove</c>).</summary>
     internal bool InLoveMeeting { get; set; }
 
-    /// <summary>Sat når beboeren er blevet valgt som modpart i en samtale: venter <see cref="PendingResponseIn"/>
-    /// sekunder mere (til starterens replik er læst færdig), og svarer så med en tilfældig af disse. Mens
-    /// det står på, bliver beboeren stående i stedet for at vandre videre — se World.StepSpeech/StepWander.</summary>
+    /// <summary>Sat når beboeren er blevet valgt som modpart i en samtale.</summary>
     internal IReadOnlyList<string>? PendingResponseOptions { get; set; }
     internal double PendingResponseIn { get; set; }
+
+    /// <summary>Tid beboeren skal blive stående stille efter at have stillet et spørgsmål, mens den venter på svar.</summary>
+    internal double ConvoWaitRemaining { get; set; }
 }
