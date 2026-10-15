@@ -12,5 +12,10 @@
   { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Uhhh der kom min kysti - dejligt!" },
   { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Næææh, en kysti kom flyvende - lækkert!" },
   { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Det koster et kys at komme flyvende!" },
-  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "En kysti! Haps haps." }
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "En kysti! Haps haps." },
+  { "trigger": "pickedUp", "speaker": "lisa", "text": "Det her er ikke padel – sæt mig ned!" },
+  { "trigger": "pickedUp", "speaker": "stephan", "text": "Det føles som et Souls-fald. Jeg dør nu." },
+  { "trigger": "pickedUp", "speaker": "maxemil", "text": "Wiii! Igen!" },
+  { "trigger": "pickedUp", "speaker": "mathilde", "text": "Whoa – det her skal på TikTok!" },
+  { "trigger": "arrivalKiss", "speaker": "Adult", "text": "Kys ved ankomst – fuld service!" }
 ]

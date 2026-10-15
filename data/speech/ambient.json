@@ -73,12 +73,12 @@
     "rooms": [ "mathildes_bedroom", "living_room" ]
   },
   {
-    "text": "Hør lige den sang, jeg har lavet på keyboardet!",
+    "text": "Hør! Keyboard! Musik!",
     "speaker": "maxemil",
     "rooms": [ "maxemils_bedroom" ]
   },
   {
-    "text": "Jeg keder mig... må jeg ikke godt få iPad'en?",
+    "text": "Tablet? Musik, ja?",
     "speaker": "maxemil",
     "timeRange": { "from": "09:00", "to": "19:00" }
   },
@@ -106,5 +106,191 @@
     "text": "Sikke en hyggelig brændeovn vi har.",
     "speaker": "Adult",
     "requiresApplianceInRoom": "fireplace"
+  },
+  {
+    "text": "Kulhydrater... sukker i forklædning.",
+    "speaker": "lisa",
+    "rooms": [ "kitchen_family_room" ]
+  },
+  {
+    "text": "Jeg SKAL i gang med styrketræning.",
+    "speaker": "lisa"
+  },
+  {
+    "text": "Padel i aften – vi skal træne op til DPF!",
+    "speaker": "lisa",
+    "timeRange": { "from": "15:00", "to": "20:00" }
+  },
+  {
+    "text": "Jeg ringer lige til mor og far og hører, hvordan det går.",
+    "speaker": "lisa",
+    "timeRange": { "from": "09:00", "to": "20:00" }
+  },
+  {
+    "text": "Far kan ikke få maskinen til at køre igen... jeg går lige derover.",
+    "speaker": "lisa"
+  },
+  {
+    "text": "Den der useEffect laver vist et uendeligt loop.",
+    "speaker": "lisa",
+    "rooms": [ "lisas_office" ]
+  },
+  {
+    "text": "Hvorfor re-rendrer den komponent nu?!",
+    "speaker": "lisa",
+    "rooms": [ "lisas_office" ]
+  },
+  {
+    "text": "Nu må Subnautica 2 gerne snart komme ud…",
+    "speaker": "lisa"
+  },
+  {
+    "text": "Jeg burde vist spille den nye 'Echoes of Sekigahara' DLC til Ghost of Yōtei.",
+    "speaker": "lisa",
+    "requiresApplianceInRoom": "tv"
+  },
+  {
+    "text": "Vi skal ud og øve nedbremsning og kurver, inden sæsonen slutter.",
+    "speaker": "lisa"
+  },
+  {
+    "text": "Måske jeg også skulle spille Saros - det kan ikke være sværere end Returnal.",
+    "speaker": "lisa",
+    "requiresApplianceInRoom": "tv"
+  },
+  {
+    "text": "Har nogen set mit padelbat?",
+    "speaker": "lisa",
+    "rooms": [ "entrance_hall", "garage" ]
+  },
+  {
+    "text": "YOU DIED… for f'-sake!",
+    "speaker": "stephan",
+    "rooms": [ "stephans_office" ],
+    "timeRange": { "from": "18:00", "to": "23:00" }
+  },
+  {
+    "text": "Dark Souls 3 er STADIG det bedste spil nogensinde lavet.",
+    "speaker": "stephan"
+  },
+  {
+    "text": "Saros i aften, tak for det bedufti!",
+    "speaker": "stephan",
+    "requiresApplianceInRoom": "tv",
+    "timeRange": { "from": "18:00", "to": "23:00" }
+  },
+  {
+    "text": "Claude - find den null reference exception!",
+    "speaker": "stephan",
+    "rooms": [ "stephans_office" ]
+  },
+  {
+    "text": "Hvem har lavet en async der kaldes sync i det her projekt?!",
+    "speaker": "stephan",
+    "rooms": [ "stephans_office" ]
+  },
+  {
+    "text": "Jeg kan vist lige nå at løfte, inden vi skal gå....",
+    "speaker": "stephan",
+    "rooms": [ "stephans_office" ]
+  },
+  {
+    "text": "Så er der et færdigt print – lad os se, om det holdt.",
+    "speaker": "stephan",
+    "rooms": [ "stephans_office" ]
+  },
+  {
+    "text": "Bare en lille ting i Blender… det tager kun fem minutter (Right!).",
+    "speaker": "stephan"
+  },
+  {
+    "text": "Bordtennis på torsdag – jeg skal have den forhånd kørt ind.",
+    "speaker": "stephan"
+  },
+  {
+    "text": "Gris! Øf øf!",
+    "speaker": "maxemil"
+  },
+  {
+    "text": "Nye batteri til min Bella!",
+    "speaker": "maxemil",
+    "rooms": [ "maxemils_bedroom" ]
+  },
+  {
+    "text": "Ringetone Telefon!",
+    "speaker": "maxemil"
+  },
+  {
+    "text": "Chips! Skruuuge-chips!",
+    "speaker": "maxemil",
+    "rooms": [ "kitchen_family_room" ]
+  },
+  {
+    "text": "Pizza? Pizza nu?",
+    "speaker": "maxemil",
+    "timeRange": { "from": "16:00", "to": "19:00" }
+  },
+  {
+    "text": "Kan jeg få spegepølse?",
+    "speaker": "maxemil",
+    "rooms": [ "kitchen_family_room" ]
+  },
+  {
+    "text": "Det er min PopIt!",
+    "speaker": "maxemil"
+  },
+  {
+    "text": "Fuglen griner!",
+    "speaker": "maxemil"
+  },
+  {
+    "text": "Hvor er Mathilde?!",
+    "speaker": "maxemil"
+  },
+  {
+    "text": "Annyeonghaseyo! …Duolingo siger, jeg udtaler det forkert?!",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Koreansk er SÅ svært, når alt andet er på dansk og engelsk.",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Durch den Monsuuuun!",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "I'm a shadow boxer baby... I wanna be ready for what you do...",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Jeg laver et nyt perlearmbånd – tror du, Farmor vil synes om det her?",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Mine Sims har brændt køkkenet ned. Igen.",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Kan nogen give mig Robux? Bare lidt?",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Jeg har tegnet en ny karakter – hun har rødt hår ligesom mig.",
+    "speaker": "mathilde"
+  },
+  {
+    "text": "Det bliver mørkt så tidligt nu.",
+    "speaker": "Adult",
+    "timeRange": { "from": "17:00", "to": "20:00" }
+  },
+  {
+    "text": "Der ligger blade over hele terrassen.",
+    "speaker": "Adult",
+    "timeRange": { "from": "10:00", "to": "17:00" }
+  },
+  {
+    "text": "Skal vi købe græskar til Halloween?",
+    "speaker": "Adult"
   }
 ]

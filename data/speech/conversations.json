@@ -53,7 +53,7 @@
       "Ja, det er skønt vejr i dag!",
       "Skal vi tage bolden med?",
       "Jeg henter lige en trøje først.",
-      "Kun en kort Ã©n, jeg er midt i noget."
+      "Kun en kort én, jeg er midt i noget."
     ]
   },
   {
@@ -63,7 +63,7 @@
     "timeRange": { "from": "16:00", "to": "23:00" },
     "responses": [
       "Ja, det lyder vildt hyggeligt!",
-      "God idÃ©, jeg fryser lidt om tæerne.",
+      "God idé, jeg fryser lidt om tæerne.",
       "Kun hvis du henter mere brænde."
     ]
   },
@@ -76,6 +76,118 @@
       "Jeg mangler lige at finde mit penalhus.",
       "Det gjorde jeg allerede i eftermiddags!",
       "Gør det lige om fem minutter."
+    ]
+  },
+  {
+    "starter": "Skal vi tage en sidste MC-tur, inden vinteren kommer?",
+    "speaker": "stephan",
+    "responder": "lisa",
+    "responses": [
+      "Ja, hvis vejret holder!",
+      "Kan jeg låne de varme handsker?",
+      "Jeg skal lige have tjekket dæktrykket først."
+    ]
+  },
+  {
+    "starter": "Skal vi spille padel i weekenden?",
+    "speaker": "lisa",
+    "responder": "stephan",
+    "responses": [
+      "Ja, jeg booker en bane!",
+      "Hvis din arm kan holde til det.",
+      "Lad os finde en mixkamp."
+    ]
+  },
+  {
+    "starter": "Hvornår starter vi egentlig med at styrketræne sammen?",
+    "speaker": "lisa",
+    "responder": "stephan",
+    "responses": [ "Lige nu - let's go!", "Bænken står jo lige derinde." ]
+  },
+  {
+    "starter": "Hvad skal vi have til aftensmad – noget med kød, gætter jeg på?",
+    "speaker": "stephan",
+    "responder": "lisa",
+    "rooms": [ "kitchen_family_room" ],
+    "timeRange": { "from": "15:00", "to": "19:00" },
+    "responses": [
+      "Bøf! Og ingen kartofler til mig.",
+      "Spegepølsemadder til Max-Emil i hvert fald.",
+      "Hvad med kylling fra grillen?"
+    ]
+  },
+  {
+    "starter": "Jeg skal lige over til mine forældre i morgen.",
+    "speaker": "lisa",
+    "responder": "stephan",
+    "responses": [
+      "Skal jeg gå med?",
+      "Hils dem mange gange.",
+      "Har de brug for, at jeg handler imens?"
+    ]
+  },
+  {
+    "starter": "Vil du høre mig synge Tokio Hotel på tysk?",
+    "speaker": "mathilde",
+    "responder": "Adult",
+    "responses": [
+      "Ja, kør på!",
+      "Imponerende, at du kan det hele udenad.",
+      "Ja, sehr gerne!"
+    ]
+  },
+  {
+    "starter": "Må jeg spille PlayStation?",
+    "speaker": "mathilde",
+    "responder": "Adult",
+    "requiresApplianceInRoom": "tv",
+    "responses": [
+      "En time, så skal du i bad.",
+      "Lige når jeg er færdig med Saros.",
+      "Skal du spille Horizon?"
+    ]
+  },
+  {
+    "starter": "Hvem har taget opladeren til tabletten?",
+    "speaker": "Anyone",
+    "responders": [ "stephan", "lisa", "mathilde" ],
+    "responses": [
+      "Max-Emil havde den sidst.",
+      "Den ligger i køkkenet.",
+      "Ikke mig!"
+    ]
+  },
+  {
+    "starter": "Vil du se, hvad jeg har printet?",
+    "speaker": "stephan",
+    "responders": [ "lisa", "mathilde" ],
+    "rooms": [ "stephans_office" ],
+    "responses": [
+      "Wow, det er jo flot!",
+      "Hvad skal det bruges til?",
+      "Kan du printe en til mig?"
+    ]
+  },
+  {
+    "starter": "Hvem har spist alle chipsene?",
+    "speaker": "Adult",
+    "responders": [ "stephan", "lisa", "mathilde" ],
+    "rooms": [ "kitchen_family_room" ],
+    "responses": [
+      "Det var nok Max-Emil…",
+      "Jeg har ikke rørt dem!",
+      "Der er en pose mere i viktualierummet."
+    ]
+  },
+  {
+    "starter": "Er det ikke sengetid snart?",
+    "speaker": "Adult",
+    "responder": "mathilde",
+    "timeRange": { "from": "20:00", "to": "22:00" },
+    "responses": [
+      "Fem minutter mere!",
+      "Jeg skal lige læse et kapitel færdigt.",
+      "Okay, godnat!"
     ]
   }
 ]

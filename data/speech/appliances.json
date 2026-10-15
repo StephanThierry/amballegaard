@@ -58,5 +58,60 @@
     "pointKind": "washerDoor",
     "speaker": "Adult",
     "text": "Jeg sætter lige en vask over."
+  },
+  {
+    "pointKind": "fridge",
+    "speaker": "maxemil",
+    "text": "Spegepølse!"
+  },
+  {
+    "pointKind": "fridge",
+    "speaker": "stephan",
+    "text": "Vi mangler græsk yoghurt."
+  },
+  {
+    "pointKind": "freezer",
+    "speaker": "mathilde",
+    "text": "Er der flere is? Jeg spørger for en ven."
+  },
+  {
+    "pointKind": "oven",
+    "speaker": "Adult",
+    "text": "Ovnen skal lige varme op."
+  },
+  {
+    "pointKind": "tap",
+    "speaker": "Anyone",
+    "text": "Ah, et glas koldt vand."
+  },
+  {
+    "pointKind": "tv",
+    "speaker": "maxemil",
+    "text": "Musik! Tænd musik!"
+  },
+  {
+    "pointKind": "tv",
+    "speaker": "stephan",
+    "text": "Bare én boss mere, så går jeg i seng."
+  },
+  {
+    "pointKind": "washerDoor",
+    "speaker": "Adult",
+    "text": "Hvem har glemt en manga i lommen?!"
+  },
+  {
+    "pointKind": "toiletLid",
+    "speaker": "Adult",
+    "text": "Hvem lader ALTID låget stå oppe?"
+  },
+  {
+    "pointKind": "wardrobe",
+    "speaker": "mathilde",
+    "text": "Jeg har intet at tage på!"
+  },
+  {
+    "pointKind": "lamp",
+    "speaker": "lisa",
+    "text": "Lidt hyggelys i aften."
   }
 ]

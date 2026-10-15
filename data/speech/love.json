@@ -39,5 +39,33 @@
       { "speaker": "lisa", "text": "Det kan jeg ikke tage imod - du får det lige tilbage" }
     ],
     "endsWithKiss": true
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Du er bedre end Dark Souls 3." },
+      { "speaker": "lisa", "text": "Det er det største kompliment, du nogensinde har givet." }
+    ],
+    "endsWithKiss": true
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Ti år, og jeg er stadig helt vild med dig." },
+      { "speaker": "lisa", "text": "Uftii!" }
+    ],
+    "endsWithKiss": true
+  },
+  {
+    "lines": [
+      { "speaker": "lisa", "text": "Er du glad for Saros?" },
+      { "speaker": "stephan", "text": "Mega go' fødselsdagsgave. Næstbedst efter dig." }
+    ],
+    "endsWithKiss": false
+  },
+  {
+    "lines": [
+      { "speaker": "stephan", "text": "Skal vi tage en tur på motorcyklerne bare os to?" },
+      { "speaker": "lisa", "text": "Ja! Og frokost et sted på vejen." }
+    ],
+    "endsWithKiss": false
   }
 ]
